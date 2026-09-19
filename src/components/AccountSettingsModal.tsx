@@ -70,6 +70,11 @@ export default function AccountSettingsModal({
                 {v.label}
               </option>
             ))}
+            {/* A previously-saved id that's since dropped out of VOICE_OPTIONS would otherwise silently
+                render as "Use narrator default" while still being what's actually saved — surface it instead. */}
+            {preferredVoiceId && !VOICE_OPTIONS.some((v) => v.id === preferredVoiceId) && (
+              <option value={preferredVoiceId}>Previously saved voice ({preferredVoiceId})</option>
+            )}
           </select>
         </div>
         <label className="checkbox-row">

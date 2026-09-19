@@ -127,6 +127,13 @@ main {
   margin-top: 28px;
 }
 
+.routine-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  margin-top: 28px;
+}
+
 .hero-card {
   background: var(--accent-soft);
   border-radius: var(--radius-lg);
@@ -686,6 +693,11 @@ select:focus {
   align-items: center;
   gap: 8px;
   position: relative;
+  /* Keeps the account button (and its dropdown, anchored to its right edge)
+     flush right even when the header wraps to its own row on narrow
+     screens — without this, a wrapped flex item sits flush left instead,
+     which pushed the dropdown menu off the left edge of the viewport. */
+  margin-left: auto;
 }
 
 .account-btn {
@@ -822,6 +834,7 @@ textarea:focus {
 
 @media (max-width: 800px) {
   .dash-grid,
+  .routine-grid,
   .session-layout,
   .summary-grid {
     grid-template-columns: 1fr;

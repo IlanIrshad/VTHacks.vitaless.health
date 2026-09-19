@@ -28,7 +28,7 @@ export default function RoutinesView({ active, biometrics, activeRoutineId, onRo
       {activeRoutineId ? (
         <RoutinePlayer biometrics={biometrics} activeRoutineId={activeRoutineId} onRoutineChange={onRoutineChange} />
       ) : (
-        <div className="dash-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
+        <div className="routine-grid">
           {Object.values(ROUTINES).map((r) => (
             <div key={r.id} className="routine-card">
               <div>
