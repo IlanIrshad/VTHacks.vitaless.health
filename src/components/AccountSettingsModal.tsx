@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { AuthUser, UserPreferences } from "@/lib/useAuth";
+import { VOICE_OPTIONS } from "@/lib/voices";
 
 export default function AccountSettingsModal({
   user,
@@ -61,8 +62,15 @@ export default function AccountSettingsModal({
           <textarea id="pref-goals" rows={3} placeholder="What are you working on?" value={goals} onChange={(e) => setGoals(e.target.value)} />
         </div>
         <div className="field">
-          <label htmlFor="pref-voice">Preferred ElevenLabs voice ID</label>
-          <input id="pref-voice" type="text" value={preferredVoiceId} onChange={(e) => setPreferredVoiceId(e.target.value)} />
+          <label htmlFor="pref-voice">Preferred voice</label>
+          <select id="pref-voice" value={preferredVoiceId} onChange={(e) => setPreferredVoiceId(e.target.value)}>
+            <option value="">Use narrator default</option>
+            {VOICE_OPTIONS.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.label}
+              </option>
+            ))}
+          </select>
         </div>
         <label className="checkbox-row">
           <input type="checkbox" checked={notifyCheckIns} onChange={(e) => setNotifyCheckIns(e.target.checked)} />

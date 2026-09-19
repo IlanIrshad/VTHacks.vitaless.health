@@ -410,6 +410,21 @@ input[type="text"]:focus {
   outline-offset: -1px;
 }
 
+select {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  padding: 11px 14px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
 .send-btn {
   border: none;
   background: var(--accent);
