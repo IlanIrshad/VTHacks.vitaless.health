@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vitaless — AI-powered wellness</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAF7F2;
+    --surface: #FFFFFF;
+    --ink: #1C2B27;
+    --muted: #6B7A76;
+    --accent: #3D7A68;
+    --accent-soft: #E4EFE9;
+    --warn: #E0785A;
+    --line: #E4DED2;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Work Sans', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, .headline { font-family: 'Fraunces', Georgia, serif; margin: 0; }
+
+  a { color: inherit; }
+
+  button { font-family: inherit; cursor: pointer; }
+
+  /* ---------- Top nav ---------- */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 40px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .logo {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  nav {
+    display: flex;
+    gap: 8px;
+    background: var(--bg);
+    padding: 4px;
+    border-radius: 999px;
+  }
+
+  nav button {
+    border: none;
+    background: transparent;
+    padding: 10px 20px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  nav button.active {
+    background: var(--accent);
+    color: var(--surface);
+  }
+
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 48px 40px 80px 40px;
+  }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ---------- Dashboard view ---------- */
+  .dash-grid {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 24px;
+    margin-top: 28px;
+  }
+
+  .hero-card {
+    background: var(--accent-soft);
+    border-radius: 24px;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .state-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .icon-circle {
+    width: 56px;
+    height: 56px;
+    border-radius: 999px;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .eyebrow {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .primary-btn {
+    border: none;
+    background: var(--accent);
+    color: var(--surface);
+    font-size: 15px;
+    font-weight: 600;
+    padding: 14px 24px;
+    border-radius: 14px;
+    align-self: flex-start;
+  }
+
+  .metrics-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .metric-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .metric-value {
+    font-size: 26px;
+    font-weight: 700;
+  }
+
+  .metric-delta { font-size: 13px; color: var(--muted); }
+  .metric-delta.up { color: var(--accent); font-weight: 600; }
+
+  .insight-card {
+    grid-column: 1 / -1;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 24px;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .voice-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    border: none;
+    background: var(--accent-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* ---------- Live session view ---------- */
+  .session-layout {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 28px;
+    margin-top: 28px;
+    align-items: start;
+  }
+
+  .camera-frame {
+    background: var(--ink);
+    border-radius: 24px;
+    aspect-ratio: 4 / 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    color: #EAF3EF;
+  }
+
+  .pulse-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    background: var(--accent);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
+  }
+
+  .live-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .live-metric {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 16px;
+    text-align: center;
+  }
+
+  .live-metric .val { font-size: 20px; font-weight: 700; margin: 6px 0 4px 0; }
+  .live-metric .tag { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .live-metric .tag.warn { color: var(--warn); }
+
+  .advice-card {
+    background: var(--accent-soft);
+    border-radius: 20px;
+    padding: 24px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .end-btn {
+    margin-top: 20px;
+    width: 100%;
+    border: none;
+    background: var(--warn);
+    color: var(--surface);
+    font-size: 15px;
+    font-weight: 600;
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  /* ---------- Trends view ---------- */
+  .tabs-row { display: flex; gap: 8px; margin: 28px 0 20px 0; }
+
+  .pill-btn {
+    height: 36px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .pill-btn.active {
+    background: var(--accent);
+    color: var(--surface);
+    border-color: var(--accent);
+  }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 28px;
+  }
+
+  .chart-axis {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 4px;
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .session-list { margin-top: 32px; }
+
+  .session-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 4px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .session-row .date { font-weight: 600; font-size: 14px; }
+  .session-row .meta { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  @media (max-width: 800px) {
+    .dash-grid, .session-layout { grid-template-columns: 1fr; }
+    header { padding: 16px 20px; }
+    main { padding: 32px 20px 60px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Vitaless</div>
+  <nav>
+    <button class="nav-btn active" data-view="dashboard">Dashboard</button>
+    <button class="nav-btn" data-view="session">Live session</button>
+    <button class="nav-btn" data-view="routines">Routines</button>
+    <button class="nav-btn" data-view="trends">Trends</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- DASHBOARD -->
+  <section id="dashboard" class="view active">
+    <div class="eyebrow">Good afternoon, Kavan</div>
+    <h1 style="font-size: 34px; margin-top: 4px;">Your vitals, right now</h1>
+
+    <div class="dash-grid">
+      <div class="hero-card">
+        <div class="state-row">
+          <div class="icon-circle">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#3D7A68" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-8 4 16 2-8h6"/></svg>
+          </div>
+          <div>
+            <div class="eyebrow">Overall state</div>
+            <div class="headline" style="font-size: 22px; font-weight: 700;">Calm &amp; focused</div>
+          </div>
+        </div>
+        <p style="margin: 0; color: var(--muted); font-size: 15px; line-height: 1.5;">
+          Your stress has stayed low for the last 20 minutes. This is a good window to keep working through your task list.
+        </p>
+        <button class="primary-btn" onclick="startCheckIn()">Start check-in</button>
+      </div>
+
+      <div class="metrics-col">
+        <div class="metric-card">
+          <div class="metric-label">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-8 4 16 2-8h6"/></svg>
+            Heart rate
+          </div>
+          <div class="metric-value">72 bpm</div>
+          <div class="metric-delta">Steady</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>
+            Stress
+          </div>
+          <div class="metric-value">Low</div>
+          <div class="metric-delta up">-12% vs yesterday</div>
+        </div>
+      </div>
+
+      <div class="insight-card">
+        <div style="flex: 1;">
+          <div class="eyebrow" style="margin-bottom: 6px;">Today's insight</div>
+          <p id="dashboardInsight" style="margin: 0; font-size: 15px; line-height: 1.5;">Your focus has been highest between 10am and noon. Good window for deep work tomorrow.</p>
+        </div>
+        <button class="voice-btn" aria-label="Play voice insight" onclick="alert('Would trigger ElevenLabs voice playback')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3D7A68" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8a5 5 0 010 8"/></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- LIVE SESSION -->
+  <section id="session" class="view">
+    <h1 style="font-size: 30px;">Live session</h1>
+
+    <div class="session-layout">
+      <div>
+        <div class="camera-frame">
+          <div class="pulse-dot"></div>
+          <div style="font-size: 14px; font-weight: 500;">Reading vitals…</div>
+        </div>
+        <div class="live-metrics">
+          <div class="live-metric">
+            <div class="metric-label" style="justify-content: center;">Heart rate</div>
+            <div class="val" style="color: var(--warn);">81 bpm</div>
+            <div class="tag warn">Rising</div>
+          </div>
+          <div class="live-metric">
+            <div class="metric-label" style="justify-content: center;">Stress</div>
+            <div class="val">Medium</div>
+            <div class="tag">Watching</div>
+          </div>
+          <div class="live-metric">
+            <div class="metric-label" style="justify-content: center;">Focus</div>
+            <div class="val">68%</div>
+            <div class="tag">Holding</div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="advice-card">
+          <div style="flex: 1;">
+            <div class="eyebrow" style="margin-bottom: 6px;">Sage says</div>
+            <p id="adviceText" style="margin: 0; font-size: 15px; line-height: 1.5;">Take a slow breath. Your heart rate is climbing — let's bring it back down together.</p>
+          </div>
+          <button class="voice-btn" style="background: var(--surface);" aria-label="Play voice coaching" onclick="alert('Would trigger ElevenLabs voice playback')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3D7A68" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8a5 5 0 010 8"/></svg>
+          </button>
+        </div>
+        <button class="end-btn" onclick="switchView('dashboard')">End session</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ROUTINES -->
+  <section id="routines" class="view">
+    <h1 style="font-size: 30px;">Guided routines</h1>
+    <p style="color: var(--muted); margin-top: 6px;">Sage adapts pacing to how you're doing right now.</p>
+
+    <div id="routineList" class="dash-grid" style="margin-top: 28px; grid-template-columns: repeat(2, 1fr);">
+      <!-- filled in by JS from the ROUTINES object -->
+    </div>
+
+    <div id="routinePlayer" style="display: none; margin-top: 28px;">
+      <div class="advice-card" style="flex-direction: column; align-items: stretch; gap: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="eyebrow" id="routineStepLabel">Step 1 of 4</div>
+          <button class="pill-btn" onclick="endRoutine()">End routine</button>
+        </div>
+        <p id="routineStepText" class="headline" style="font-size: 20px; font-weight: 700; margin: 0;">Loading…</p>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <button class="voice-btn" style="background: var(--surface);" aria-label="Replay narration" onclick="playRoutineVoice()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3D7A68" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8a5 5 0 010 8"/></svg>
+          </button>
+          <div id="routinePaceNote" style="font-size: 13px; color: var(--muted);">Pace: normal</div>
+        </div>
+        <audio id="routineAudio" style="display:none;"></audio>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRENDS -->
+  <section id="trends" class="view">
+    <h1 style="font-size: 30px;">Trends</h1>
+    <p style="color: var(--muted); margin-top: 6px;">Your vitals over time</p>
+
+    <div class="tabs-row">
+      <button class="pill-btn active">Day</button>
+      <button class="pill-btn">Week</button>
+      <button class="pill-btn">Month</button>
+    </div>
+
+    <div class="chart-card">
+      <div class="eyebrow">Focus score</div>
+      <svg viewBox="0 0 600 140" width="100%" height="160" preserveAspectRatio="none" style="margin-top: 10px;">
+        <path d="M0,80 L100,60 L200,72 L300,48 L400,58 L500,32 L600,42 L600,140 L0,140 Z" fill="#E4EFE9"></path>
+        <polyline points="0,80 100,60 200,72 300,48 400,58 500,32 600,42" fill="none" stroke="#3D7A68" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
+        <circle cx="0" cy="80" r="4.5" fill="#3D7A68"></circle>
+        <circle cx="100" cy="60" r="4.5" fill="#3D7A68"></circle>
+        <circle cx="200" cy="72" r="4.5" fill="#3D7A68"></circle>
+        <circle cx="300" cy="48" r="4.5" fill="#3D7A68"></circle>
+        <circle cx="400" cy="58" r="4.5" fill="#3D7A68"></circle>
+        <circle cx="500" cy="32" r="4.5" fill="#3D7A68"></circle>
+        <circle cx="600" cy="42" r="4.5" fill="#3D7A68"></circle>
+      </svg>
+      <div class="chart-axis">
+        <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+      </div>
+    </div>
+
+    <div class="session-list">
+      <h3 style="font-size: 16px; margin-bottom: 4px;">Recent sessions</h3>
+      <div class="session-row">
+        <div>
+          <div class="date">Today, 2:14 PM</div>
+          <div class="meta">12 min · avg stress low</div>
+        </div>
+      </div>
+      <div class="session-row">
+        <div>
+          <div class="date">Today, 10:02 AM</div>
+          <div class="meta">8 min · avg stress medium</div>
+        </div>
+      </div>
+      <div class="session-row" style="border-bottom: none;">
+        <div>
+          <div class="date">Yesterday, 4:47 PM</div>
+          <div class="meta">15 min · avg stress low</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  // ---------- Talk to Ilan's Next.js backend ----------
+  // If your server runs on a different port/host than this page, set it here.
+  // Leave empty ("") if this page is served by the same Next.js app.
+  const API_BASE = "";
+
+  // GET /api/biometrics -> { heartRate, stress, focus, energy }
+  // (Falls back to simulated readings server-side if no Presage key is set.)
+  async function getCurrentVitals() {
+    const res = await fetch(`${API_BASE}/api/biometrics`);
+    if (!res.ok) throw new Error(`biometrics error ${res.status}`);
+    return res.json();
+  }
+
+  // POST /api/companion { routine, step, vitals } -> { reply }
+  async function getCompanionLine(routineId, stepIndex, vitals) {
+    const res = await fetch(`${API_BASE}/api/companion`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ routine: routineId, step: stepIndex, vitals })
+    });
+    if (!res.ok) throw new Error(`companion error ${res.status}`);
+    const data = await res.json();
+    return data.reply;
+  }
+
+  // POST /api/voice { text } -> audio bytes
+  async function playVoice(text) {
+    const res = await fetch(`${API_BASE}/api/voice`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+    if (!res.ok) throw new Error(`voice error ${res.status}`);
+    const blob = await res.blob();
+    const audioEl = document.getElementById("routineAudio") || new Audio();
+    audioEl.src = URL.createObjectURL(blob);
+    audioEl.play();
+    return audioEl;
+  }
+
+  async function startCheckIn() {
+    switchView("session");
+    const adviceEl = document.getElementById("adviceText");
+    adviceEl.textContent = "Thinking…";
+    try {
+      const vitals = await getCurrentVitals();
+      const tip = await getCompanionLine("check-in", 0, vitals);
+      adviceEl.textContent = tip;
+    } catch (err) {
+      console.error(err);
+      adviceEl.textContent = "Couldn't reach Sage's server — check it's running and API_BASE is set right.";
+    }
+  }
+
+  // ---------- Routines ----------
+  const ROUTINES = {
+    "box-breathing": { name: "Box breathing", desc: "4-count inhale, hold, exhale, hold.", steps: ["Inhale", "Hold", "Exhale", "Hold"] },
+    "body-scan": { name: "Body scan", desc: "Slow attention pass from head to toe.", steps: ["Head & shoulders", "Chest & arms", "Stomach & hips", "Legs & feet"] },
+    "focus-reset": { name: "Focus reset", desc: "Short reset for a wandering mind.", steps: ["Notice", "Release", "Refocus"] },
+    "energy-boost": { name: "Energy boost", desc: "Quick routine to shake off a slump.", steps: ["Stretch", "Breathe fast", "Settle"] }
+  };
+
+  let currentRoutine = null;
+  let currentStep = 0;
+
+  function renderRoutineList() {
+    const container = document.getElementById("routineList");
+    container.innerHTML = "";
+    Object.entries(ROUTINES).forEach(([id, r]) => {
+      const card = document.createElement("div");
+      card.className = "metric-card";
+      card.innerHTML = `
+        <div class="headline" style="font-size: 18px; font-weight: 700;">${r.name}</div>
+        <p style="margin: 0; font-size: 14px; color: var(--muted);">${r.desc}</p>
+        <button class="primary-btn" style="margin-top: 8px;" onclick="startRoutine('${id}')">Start</button>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  async function startRoutine(id) {
+    currentRoutine = id;
+    currentStep = 0;
+    document.getElementById("routinePlayer").style.display = "block";
+    await runRoutineStep();
+  }
+
+  async function runRoutineStep() {
+    const routine = ROUTINES[currentRoutine];
+    const stepLabel = document.getElementById("routineStepLabel");
+    const stepText = document.getElementById("routineStepText");
+    const paceNote = document.getElementById("routinePaceNote");
+
+    stepLabel.textContent = `Step ${currentStep + 1} of ${routine.steps.length}`;
+    stepText.textContent = "Loading…";
+
+    try {
+      const vitals = await getCurrentVitals();
+      const line = await getCompanionLine(currentRoutine, currentStep, vitals);
+      stepText.textContent = line || routine.steps[currentStep];
+
+      // Simple adaptive pacing: give more time if stress is high.
+      const extending = vitals.stress === "high";
+      paceNote.textContent = extending ? "Pace: slowed down for you" : "Pace: normal";
+      await playRoutineVoice();
+
+      const baseMs = 6000;
+      const waitMs = extending ? baseMs * 1.5 : baseMs;
+      setTimeout(() => {
+        if (currentRoutine === null) return; // routine was ended early
+        currentStep++;
+        if (currentStep < routine.steps.length) {
+          runRoutineStep();
+        } else {
+          endRoutine();
+        }
+      }, waitMs);
+    } catch (err) {
+      console.error(err);
+      stepText.textContent = "Couldn't reach Sage's server for this step.";
+    }
+  }
+
+  async function playRoutineVoice() {
+    const stepText = document.getElementById("routineStepText").textContent;
+    try {
+      await playVoice(stepText);
+    } catch (err) {
+      console.error("voice playback failed", err);
+    }
+  }
+
+  function endRoutine() {
+    currentRoutine = null;
+    currentStep = 0;
+    document.getElementById("routinePlayer").style.display = "none";
+  }
+
+  renderRoutineList();
+
+  function switchView(viewId) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById(viewId).classList.add('active');
+    document.querySelectorAll('.nav-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.view === viewId);
+    });
+  }
+
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.dataset.view));
+  });
+
+  document.querySelectorAll('.tabs-row .pill-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tabs-row .pill-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>
