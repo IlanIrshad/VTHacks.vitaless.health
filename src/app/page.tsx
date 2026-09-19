@@ -1,28 +1,68 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import TopNav, { type ViewId } from "@/components/TopNav";
 import DashboardView from "@/components/DashboardView";
 import LiveSessionView from "@/components/LiveSessionView";
 import RoutinesView from "@/components/RoutinesView";
 import TrendsView from "@/components/TrendsView";
+import AuthModal from "@/components/AuthModal";
+import AccountSettingsModal from "@/components/AccountSettingsModal";
 import type { BiometricReading } from "@/components/WebcamCapture";
 import type { RoutineId } from "@/lib/routines";
 import type { ChatTurn } from "@/lib/chat";
+import type { AuthUser } from "@/lib/useAuth";
 import { pushHistory, type HistoryEntry } from "@/lib/trend";
+
+const DEFAULT_GREETING: ChatTurn = {
+  role: "companion",
+  text: "Hi, I'm Sage. I'll check in with you as we go — how are you feeling right now?",
+};
 
 export default function Home() {
   const [activeView, setActiveView] = useState<ViewId>("dashboard");
   const [reading, setReading] = useState<BiometricReading | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [activeRoutineId, setActiveRoutineId] = useState<RoutineId | null>(null);
-  const [turns, setTurns] = useState<ChatTurn[]>([
-    { role: "companion", text: "Hi, I'm Sage. I'll check in with you as we go — how are you feeling right now?" },
-  ]);
+  const [turns, setTurns] = useState<ChatTurn[]>([DEFAULT_GREETING]);
   const [sending, setSending] = useState(false);
+
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+
+  // Check for an existing session on load, then hydrate persisted chat
+  // history if there is one. Both are best-effort — an anonymous visitor
+  // (or a Mongo outage) just sees the normal demo-user experience.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/me");
+        const data = await res.json();
+        if (data.user) {
+          setUser(data.user);
+          loadConversation();
+        }
+      } catch {
+        // Not signed in — the app is fully usable anonymously.
+      }
+    })();
+  }, []);
+
+  async function loadConversation() {
+    try {
+      const res = await fetch("/api/conversation");
+      const data = await res.json();
+      if (Array.isArray(data.messages) && data.messages.length > 0) {
+        setTurns(data.messages.map((m: { role: "user" | "companion"; text: string }) => ({ role: m.role, text: m.text })));
+      }
+    } catch {
+      // Keep the default greeting if history can't be loaded.
+    }
+  }
 
   function handleReading(r: BiometricReading) {
     setReading(r);
@@ -97,11 +137,28 @@ export default function Home() {
     send("How am I doing right now?");
   }
 
+  async function handleSignOut() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Clear client-side state regardless — worst case the cookie outlives this tab.
+    }
+    setUser(null);
+    setTurns([DEFAULT_GREETING]);
+  }
+
   const lastCompanionText = [...turns].reverse().find((t) => t.role === "companion")?.text ?? null;
 
   return (
     <div>
-      <TopNav active={activeView} onChange={setActiveView} />
+      <TopNav
+        active={activeView}
+        onChange={setActiveView}
+        user={user}
+        onSignIn={() => setAuthModalOpen(true)}
+        onOpenSettings={() => setSettingsModalOpen(true)}
+        onSignOut={handleSignOut}
+      />
       <main>
         <DashboardView
           active={activeView === "dashboard"}
@@ -133,6 +190,24 @@ export default function Home() {
         />
         <TrendsView active={activeView === "trends"} />
       </main>
+
+      {authModalOpen && (
+        <AuthModal
+          onClose={() => setAuthModalOpen(false)}
+          onAuthed={(u) => {
+            setUser(u);
+            setAuthModalOpen(false);
+            loadConversation();
+          }}
+        />
+      )}
+      {settingsModalOpen && user && (
+        <AccountSettingsModal
+          user={user}
+          onClose={() => setSettingsModalOpen(false)}
+          onSaved={(preferences) => setUser((prev) => (prev ? { ...prev, preferences } : prev))}
+        />
+      )}
     </div>
   );
 }

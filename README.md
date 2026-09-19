@@ -1,4 +1,4 @@
-# Sage — Health Companion (VTHacks 2026)
+# Vitaless — AI-powered wellness (VTHacks 2026)
 
 A health & wellness web app with an AI companion ("Sage") that reacts to the
 user's live biometric state and leads narrated guided routines (breathing,
@@ -12,6 +12,7 @@ mindfulness, focus, energy).
 | **Google Gemini API** | Powers Sage's conversational replies and per-routine spoken intros, using live biometrics as context (`src/lib/gemini.ts`). |
 | **ElevenLabs** | Turns Sage's replies and routine narration into spoken audio (`src/lib/elevenlabs.ts`). |
 | **Tiger Data (TimescaleDB)** | Stores every biometric sample as a hypertable (`db/schema.sql`) with a continuous aggregate for fast "stress over time" queries. |
+| **MongoDB Atlas** | Optional user accounts — email/password (bcrypt-hashed), persisted Gemini chat history, and preferences (timezone, goals, preferred voice). Sign-in is opt-in; the app is fully usable anonymously (`src/lib/mongodb.ts`, `src/lib/auth.ts`). |
 | **Vultr** *(not yet wired up)* | Intended deployment target — see "Deploying" below. |
 | **GoDaddy** *(not yet wired up)* | Register a project domain and point it at the Vultr deployment for the "Best Domain Name" award. |
 
@@ -29,6 +30,9 @@ npm run db:init              # optional — only if DATABASE_URL is set
 npm run dev
 ```
 
+MongoDB needs no init script — collections and the unique index on
+`users.email` are created automatically on first signup.
+
 Open http://localhost:3000. Grant camera access when prompted (or skip it —
 the app falls back to simulated biometrics automatically).
 
@@ -40,9 +44,11 @@ See `.env.example` for the full list and where to get each key:
 - `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID` — ElevenLabs (use the VTHacks promo code at check-in)
 - `PRESAGE_API_KEY`, `PRESAGE_API_BASE_URL` — Presage dashboard. Base URL + full request/response contract confirmed live 2026-09-19 (auth is `x-api-key`, not `Authorization: Bearer`; only the `/v2/*` upload endpoints are actually deployed) — see the comment at the top of `src/lib/presage.ts`.
 - `DATABASE_URL` — Tiger Data connection string
+- `MONGODB_URI`, `SESSION_SECRET` — MongoDB Atlas connection string + a random secret for signing session cookies (generate one with the command in `.env.example`)
 
 Nothing crashes if a key is missing — that feature just falls back to a
-simulated/text-only mode so the rest of the demo keeps working.
+simulated/text-only mode (or, for Mongo, sign-in simply stays unavailable)
+so the rest of the demo keeps working.
 
 ## How the biometric-reactive routines work
 
@@ -57,30 +63,55 @@ simulated/text-only mode so the rest of the demo keeps working.
 5. Each step's narration is sent to `/api/voice` (ElevenLabs) and played
    aloud as the routine progresses.
 6. Every sample is logged to the Tiger Data hypertable via `/api/biometrics`,
-   and `GET /api/sessions` returns recent history for a future trends view.
+   and `GET /api/sessions` returns recent history for the Trends tab.
+
+## User accounts (optional)
+
+Sign-in is entirely opt-in — every screen works fully anonymously first.
+Signing in (via the "Sign in" button in the header) additionally:
+
+- Persists Gemini chat history across visits (`conversations` collection),
+  loaded back into the chat on the next sign-in.
+- Persists preferences — timezone, wellness goals, preferred ElevenLabs
+  voice, check-in reminders (`users.preferences`), editable from the
+  "Account settings" menu.
+
+Passwords are bcrypt-hashed (never stored in plain text); sessions are a
+signed JWT in an httpOnly cookie (`src/lib/auth.ts`). There's deliberately no
+email verification or password-reset flow — out of scope for the hackathon
+timeline, same as everywhere else non-essential was cut (see the build plan).
 
 ## Project structure
 
 ```
 src/
   app/
-    page.tsx                 Main screen (sensing + companion + routine)
+    page.tsx                 Root: shared state (biometrics, chat, auth) + tab views
     api/
-      companion/route.ts     POST -> Gemini reply
+      companion/route.ts     POST -> Gemini reply (+ persists chat turn if signed in)
       voice/route.ts         POST -> ElevenLabs audio (mp3)
-      biometrics/route.ts    POST -> Presage reading + DB log
-      sessions/route.ts      GET  -> recent biometric history
+      biometrics/route.ts    POST -> Presage reading + Tiger Data log
+      sessions/route.ts      GET  -> recent biometric history (Trends tab)
+      conversation/route.ts  GET  -> signed-in user's persisted chat history
+      profile/route.ts       GET/PUT -> signed-in user's preferences
+      auth/
+        signup, login, logout, me   Account + session endpoints
   components/
-    WebcamCapture.tsx        Records clips, posts to /api/biometrics
-    BiometricsPanel.tsx      Live vitals/stress/focus/energy tiles
-    CompanionChat.tsx        Chat UI with Sage
-    RoutinePlayer.tsx        Step-by-step narrated routine player
+    WebcamCapture.tsx        Always-mounted sensing loop, posts to /api/biometrics
+    DashboardView, LiveSessionView, RoutinesView, TrendsView   The 4 tabs
+    RoutinePlayer.tsx        Step-by-step narrated routine player + session summary
+    BreathingCircle.tsx      Pacing-synced breathing visual
+    TopNav.tsx                Tab nav + account menu
+    AuthModal.tsx, AccountSettingsModal.tsx   Sign-in/up and preferences UI
   lib/
-    presage.ts, gemini.ts, elevenlabs.ts, db.ts, routines.ts
+    presage.ts, gemini.ts, elevenlabs.ts, routines.ts, trend.ts, chat.ts
+    db.ts                    Tiger Data (Postgres) client
+    mongodb.ts, auth.ts      MongoDB client + password/session helpers
 db/
   schema.sql                 Tiger Data / TimescaleDB hypertable + continuous aggregate
 scripts/
-  init-db.js                 Applies db/schema.sql (npm run db:init)
+  init-db.js                 Applies db/schema.sql (npm run db:init) — Tiger Data only;
+                              MongoDB collections/indexes are created on first signup
 ```
 
 ## Deploying (Vultr + GoDaddy, for the low-effort sponsor awards)
