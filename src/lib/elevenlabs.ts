@@ -16,12 +16,12 @@ function getClient(): ElevenLabsClient {
   return client;
 }
 
-/** Synthesizes speech for the given text and returns raw MP3 bytes. */
-export async function synthesizeSpeech(text: string): Promise<Buffer> {
+/** Synthesizes speech for the given text and returns raw MP3 bytes. `voiceId` overrides the env-default narrator voice — used for a signed-in user's preferred voice. */
+export async function synthesizeSpeech(text: string, voiceId?: string): Promise<Buffer> {
   const elevenlabs = getClient();
-  const voiceId = process.env.ELEVENLABS_VOICE_ID || "JBFqnCBsd6RMkjVDRZzb";
+  const voice = voiceId || process.env.ELEVENLABS_VOICE_ID || "JBFqnCBsd6RMkjVDRZzb";
 
-  const audioStream = await elevenlabs.textToSpeech.convert(voiceId, {
+  const audioStream = await elevenlabs.textToSpeech.convert(voice, {
     text,
     modelId: "eleven_multilingual_v2",
     outputFormat: "mp3_44100_128",
