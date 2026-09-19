@@ -5,10 +5,11 @@
 import { GoogleGenAI } from "@google/genai";
 
 // Default model kept in one place / overridable via env, since Gemini model
-// IDs are versioned and change over time (checked against
-// https://ai.google.dev/gemini-api/docs/models as of Sep 2026 — a fast
-// Flash-tier model is the right fit for a hackathon chatbot's latency/cost).
-const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
+// IDs are versioned and change over time. Confirmed live against
+// https://generativelanguage.googleapis.com on 2026-09-19 — gemini-2.5-flash
+// and earlier are retired; gemini-3.6-flash is current (a fast Flash-tier
+// model is the right fit for a hackathon chatbot's latency/cost).
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
 let client: GoogleGenAI | null = null;
 

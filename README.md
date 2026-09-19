@@ -36,9 +36,9 @@ the app falls back to simulated biometrics automatically).
 
 See `.env.example` for the full list and where to get each key:
 
-- `GEMINI_API_KEY` — Google AI Studio
+- `GEMINI_API_KEY` — Google AI Studio. Default model is `gemini-3.6-flash` (confirmed live 2026-09-19 — earlier Flash models have been retired).
 - `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID` — ElevenLabs (use the VTHacks promo code at check-in)
-- `PRESAGE_API_KEY`, `PRESAGE_API_BASE_URL` — Presage dashboard (confirm the real base URL/endpoint paths once you have access — see the comment at the top of `src/lib/presage.ts`)
+- `PRESAGE_API_KEY`, `PRESAGE_API_BASE_URL` — Presage dashboard. Base URL + full request/response contract confirmed live 2026-09-19 (auth is `x-api-key`, not `Authorization: Bearer`; only the `/v2/*` upload endpoints are actually deployed) — see the comment at the top of `src/lib/presage.ts`.
 - `DATABASE_URL` — Tiger Data connection string
 
 Nothing crashes if a key is missing — that feature just falls back to a
