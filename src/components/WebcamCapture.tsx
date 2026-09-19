@@ -50,6 +50,17 @@ export default function WebcamCapture({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const [status, setStatusState] = useState<SensingStatus>("idle");
 
+  // The sensing loop below is set up once on mount (see the effect further
+  // down) so switching tabs never restarts the camera. That means its
+  // setInterval callback closes over whatever `routineId`/`onReading` were
+  // at mount time — without these refs, a routine started later would never
+  // actually get tagged on any sample (routine_id would stay null forever),
+  // which silently breaks the Tiger Data session grouping in the Trends tab.
+  const routineIdRef = useRef(routineId);
+  routineIdRef.current = routineId;
+  const onReadingRef = useRef(onReading);
+  onReadingRef.current = onReading;
+
   const setStatus = useCallback(
     (s: SensingStatus) => {
       setStatusState(s);
@@ -58,30 +69,28 @@ export default function WebcamCapture({
     [onStatusChange]
   );
 
-  const sendClip = useCallback(
-    async (blob: Blob | null) => {
-      try {
-        const params = new URLSearchParams({ userId: "demo-user" });
-        if (routineId) params.set("routineId", routineId);
+  const sendClip = useCallback(async (blob: Blob | null) => {
+    try {
+      const params = new URLSearchParams({ userId: "demo-user" });
+      const currentRoutineId = routineIdRef.current;
+      if (currentRoutineId) params.set("routineId", currentRoutineId);
 
-        let res: Response;
-        if (blob) {
-          const form = new FormData();
-          form.append("video", blob, "clip.webm");
-          res = await fetch(`/api/biometrics?${params.toString()}`, { method: "POST", body: form });
-        } else {
-          // No camera available — server returns a simulated reading.
-          res = await fetch(`/api/biometrics?${params.toString()}`, { method: "POST" });
-        }
-        if (!res.ok) return;
-        const reading = (await res.json()) as BiometricReading;
-        onReading(reading);
-      } catch {
-        // Network hiccup — just skip this sample, next interval will retry.
+      let res: Response;
+      if (blob) {
+        const form = new FormData();
+        form.append("video", blob, "clip.webm");
+        res = await fetch(`/api/biometrics?${params.toString()}`, { method: "POST", body: form });
+      } else {
+        // No camera available — server returns a simulated reading.
+        res = await fetch(`/api/biometrics?${params.toString()}`, { method: "POST" });
       }
-    },
-    [onReading, routineId]
-  );
+      if (!res.ok) return;
+      const reading = (await res.json()) as BiometricReading;
+      onReadingRef.current(reading);
+    } catch {
+      // Network hiccup — just skip this sample, next interval will retry.
+    }
+  }, []);
 
   const recordOneClip = useCallback(() => {
     const stream = streamRef.current;

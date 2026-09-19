@@ -6,12 +6,29 @@ import { Pool } from "pg";
 
 let pool: Pool | null = null;
 
+/**
+ * Recent `pg` versions treat a bare `sslmode=require` as full CA-verified
+ * TLS, which fails against Tiger Data's managed Postgres cert chain.
+ * `uselibpqcompat=true` restores the traditional libpq meaning of "require"
+ * (encrypted, not CA-verified) — see the warning `pg` itself prints without
+ * it. Passing `ssl` as a separate Pool option does NOT reliably fix this:
+ * `pg`'s ConnectionParameters does `Object.assign({}, config,
+ * parse(connectionString))`, so the connection string's own parsed `ssl`
+ * silently overwrites an explicit `ssl` option passed alongside it. The fix
+ * has to live in the connection string itself.
+ */
+function withLibpqSslCompat(connectionString: string): string {
+  if (/[?&]uselibpqcompat=/.test(connectionString)) return connectionString;
+  const sep = connectionString.includes("?") ? "&" : "?";
+  return `${connectionString}${sep}uselibpqcompat=true`;
+}
+
 function getPool(): Pool {
   if (!pool) {
     if (!process.env.DATABASE_URL) {
       throw new Error("DATABASE_URL is not set. Add it to .env.local (see .env.example).");
     }
-    pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    pool = new Pool({ connectionString: withLibpqSslCompat(process.env.DATABASE_URL) });
   }
   return pool;
 }
