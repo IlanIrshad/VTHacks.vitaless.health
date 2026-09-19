@@ -1,0 +1,157 @@
+"use client";
+
+import { useState } from "react";
+import WebcamCapture, { sensingStatusLabel, type BiometricReading, type SensingStatus } from "./WebcamCapture";
+import { trendDirection, type HistoryEntry } from "@/lib/trend";
+import type { RoutineId } from "@/lib/routines";
+import type { ChatTurn } from "@/lib/chat";
+
+interface LiveSessionViewProps {
+  active: boolean;
+  reading: BiometricReading | null;
+  history: HistoryEntry[];
+  onReading: (r: BiometricReading) => void;
+  routineId: RoutineId | null;
+  turns: ChatTurn[];
+  sending: boolean;
+  onSend: (message: string) => void;
+  onEndSession: () => void;
+}
+
+export default function LiveSessionView({
+  active,
+  reading,
+  history,
+  onReading,
+  routineId,
+  turns,
+  sending,
+  onSend,
+  onEndSession,
+}: LiveSessionViewProps) {
+  const [status, setStatus] = useState<SensingStatus>("idle");
+  const [input, setInput] = useState("");
+
+  const hrTrend = trendDirection(history, "heartRateBpm");
+  const stressTrend = trendDirection(history, "stressLevel");
+
+  const lastCompanionTurn = [...turns].reverse().find((t) => t.role === "companion");
+
+  function handleSend() {
+    const message = input.trim();
+    if (!message || sending) return;
+    setInput("");
+    onSend(message);
+  }
+
+  return (
+    <section id="session" className={`view${active ? " active" : ""}`}>
+      <h1 className="page-title" style={{ fontSize: 30 }}>
+        Live session
+      </h1>
+
+      <div className="session-layout">
+        <div>
+          <div className="camera-frame">
+            <WebcamCapture
+              onReading={onReading}
+              routineId={routineId}
+              onStatusChange={setStatus}
+              visible={status === "live"}
+              className="camera-video"
+            />
+            {status !== "live" && (
+              <div className="camera-overlay">
+                <div className="pulse-dot" />
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{sensingStatusLabel(status)}</div>
+              </div>
+            )}
+            {status === "live" && !reading && (
+              <div className="camera-overlay" style={{ position: "absolute", bottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>Measuring your pulse…</div>
+              </div>
+            )}
+          </div>
+
+          <div className="live-metrics">
+            <div className="live-metric">
+              <div className="metric-label" style={{ justifyContent: "center" }}>
+                Heart rate
+              </div>
+              <div className="val" style={{ color: hrTrend === "up" ? "var(--warn)" : undefined }}>
+                {reading ? `${Math.round(reading.heartRateBpm)} bpm` : "—"}
+              </div>
+              <div className={`tag ${hrTrend === "up" ? "warn" : hrTrend === "down" ? "up" : ""}`}>
+                {reading ? (hrTrend === "up" ? "Rising" : hrTrend === "down" ? "Falling" : "Steady") : "Sensing…"}
+              </div>
+            </div>
+            <div className="live-metric">
+              <div className="metric-label" style={{ justifyContent: "center" }}>
+                Stress
+              </div>
+              <div className="val">{reading ? `${Math.round(reading.stressLevel * 100)}%` : "—"}</div>
+              <div className={`tag ${stressTrend === "up" ? "warn" : stressTrend === "down" ? "up" : ""}`}>
+                {reading ? (stressTrend === "up" ? "Rising" : stressTrend === "down" ? "Easing" : "Watching") : "Sensing…"}
+              </div>
+            </div>
+            <div className="live-metric">
+              <div className="metric-label" style={{ justifyContent: "center" }}>
+                Focus
+              </div>
+              <div className="val">{reading ? `${Math.round(reading.focusLevel * 100)}%` : "—"}</div>
+              <div className="tag">{reading ? "Holding" : "Sensing…"}</div>
+            </div>
+          </div>
+
+          {reading && (
+            <div className="source-tag" style={{ marginTop: 10 }}>
+              Source: {reading.source === "presage" ? "Presage Human Sensing Layer" : "estimated (no PRESAGE_API_KEY set)"}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div className="advice-card">
+            <div style={{ flex: 1 }}>
+              <div className="eyebrow" style={{ marginBottom: 6 }}>
+                Sage says
+              </div>
+              <p style={{ margin: 0, fontSize: 15, lineHeight: 1.5 }}>
+                {sending
+                  ? "Thinking…"
+                  : lastCompanionTurn?.text || "Say hello, or ask how you're doing — Sage reads your live vitals as context."}
+              </p>
+            </div>
+          </div>
+
+          <div className="chat-card">
+            <div className="chat-log">
+              {turns.slice(-6).map((turn, i) => (
+                <div key={i} className={`chat-bubble ${turn.role}`}>
+                  {turn.text}
+                </div>
+              ))}
+            </div>
+            <div className="chat-input-row">
+              <input
+                type="text"
+                placeholder="Tell Sage how you're doing…"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                disabled={sending}
+              />
+              <button className="send-btn" onClick={handleSend} disabled={sending}>
+                {sending ? "…" : "Send"}
+              </button>
+            </div>
+          </div>
+
+          <button className="end-btn" onClick={onEndSession}>
+            End session
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}

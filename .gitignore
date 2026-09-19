@@ -1,0 +1,14 @@
+node_modules
+.next
+out
+.env
+.env.local
+.env*.local
+npm-debug.log*
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+
+# Local dev-server convenience scripts (machine-specific paths, not for the team repo)
+run-dev.cmd
+.claude/
