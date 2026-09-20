@@ -2,8 +2,8 @@
 //
 // DELIBERATE DESIGN CHOICE: the estimate itself is a real, published,
 // deterministic formula — not something Gemini guesses. There is no
-// scientific relationship between heart rate/respiration/HRV and adiposity,
-// so feeding them into an LLM and asking it to output a body-fat percentage
+// scientific relationship between heart rate/respiration and adiposity, so
+// feeding them into an LLM and asking it to output a body-fat percentage
 // would just be a plausible-sounding invented number, which conflicts with
 // this app's whole "never fabricate a measurement" principle. Gemini's role
 // (see getBodyCompositionInsight in lib/gemini.ts) is to write a natural-

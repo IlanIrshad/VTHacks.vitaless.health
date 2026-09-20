@@ -128,7 +128,7 @@ export default function LiveSessionView({
 
           {reading && (
             <div className="source-tag" style={{ marginTop: 10 }}>
-              Source: Presage Human Sensing Layer{typeof reading.hrvMs === "number" ? ` · HRV ${Math.round(reading.hrvMs)}ms` : ""}
+              Source: Presage Human Sensing Layer
             </div>
           )}
           {!reading && (status === "denied" || status === "unsupported") && (

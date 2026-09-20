@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export interface BiometricReading {
   heartRateBpm: number;
   respirationRateBpm: number;
-  hrvMs: number | null;
   stressLevel: number;
   focusLevel: number;
   energyLevel: number;

@@ -4,8 +4,7 @@
 // is no browser SDK. For a web app, the workaround used here is: record a
 // short webcam clip client-side (see WebcamCapture.tsx), upload it to our
 // own /api/biometrics route, and have the SERVER forward it to Presage's
-// Physiology API, which analyzes heart rate, respiration, and heart-rate
-// variability from video.
+// Physiology API, which analyzes heart rate and respiration from video.
 //
 // The real REST contract (confirmed 2026-09-19 by downloading the official
 // `Presage-Technologies` PyPI package and reading its client source, then
@@ -15,7 +14,7 @@
 // deployed):
 //
 //   1. POST {base}/v2/upload-url   headers: x-api-key
-//        body: { file_size: <bytes>, metrics: ["hr", "rr", "hrv"] }
+//        body: { file_size: <bytes>, metrics: ["hr", "rr"] }
 //        -> { id, upload_id, urls: [<presigned S3 PUT url>, ...] }
 //      (urls has one entry per 5MB chunk — our clips are always under that,
 //      so in practice there's exactly one.)
@@ -35,11 +34,16 @@
 // real face video during setup (only verified the plumbing with a dummy
 // file, which never finishes processing, since Presage can't extract a
 // pulse from noise) — resultFieldsFromResponse() below tries a few
-// plausible shapes (the request explicitly asks for metrics
-// "hr"/"rr"/"hrv", so the response very likely echoes those keys) and
-// throws with the raw JSON logged if none match, so the first real run
-// surfaces the mismatch loudly in server logs instead of silently
-// misreading a field.
+// plausible shapes (the request explicitly asks for metrics "hr"/"rr", so
+// the response very likely echoes those keys) and throws with the raw JSON
+// logged if none match, so the first real run surfaces the mismatch loudly
+// in server logs instead of silently misreading a field.
+//
+// NOTE: this account's Presage plan doesn't actually return heart-rate
+// variability (it was requested and displayed for a while, but every real
+// response came back without it) — metrics is deliberately just
+// ["hr", "rr"] now, and there is no hrv field anywhere in this app. Don't
+// re-add it without first confirming a real response actually includes it.
 //
 // DELIBERATE: there is no simulated/fabricated fallback anywhere in this
 // module. If PRESAGE_API_KEY isn't set, or Presage can't produce a result,
@@ -50,13 +54,11 @@
 export interface PresageReading {
   heartRateBpm: number;
   respirationRateBpm: number;
-  /** ms, if Presage returned it for this clip — heart-rate variability, the primary real signal the stress estimate below is grounded in. */
-  hrvMs: number | null;
   /** Derived 0-1 scores — Presage doesn't return these directly. Computed
-   *  deterministically from the real measured vitals above (HRV when
-   *  present, HR/RR otherwise) — never randomized, never fabricated. Rough
-   *  heuristic; retune against real sponsor data once real field names/units
-   *  are confirmed from an actual completed response. */
+   *  deterministically from the real measured heart rate/respiration above —
+   *  never randomized, never fabricated. Rough heuristic; retune against
+   *  real sponsor data once real field names/units are confirmed from an
+   *  actual completed response. */
   stressLevel: number;
   focusLevel: number;
   energyLevel: number;
@@ -67,29 +69,18 @@ const BASE_URL = () => process.env.PRESAGE_API_BASE_URL || "https://api.physiolo
 const MAX_PART_SIZE = 5 * 1024 * 1024; // 5MB — matches Presage's multipart upload chunking
 
 /** Maps raw vitals onto the three normalized 0-1 scores every downstream
- *  consumer (companion prompt, routine picker, UI thresholds) reads. Prefers
- *  HRV for the stress estimate when Presage returned one — lower HRV is a
- *  well-established real indicator of sympathetic/stress load — and falls
- *  back to the cruder HR/RR-only heuristic otherwise. Either way this is a
- *  deterministic function of real measured inputs, not invented data. */
+ *  consumer (companion prompt, routine picker, UI thresholds) reads. A
+ *  deterministic function of real measured heart rate/respiration — not
+ *  invented data. */
 export function deriveScores(
   heartRateBpm: number,
-  respirationRateBpm: number,
-  hrvMs?: number | null
+  respirationRateBpm: number
 ): {
   stressLevel: number;
   focusLevel: number;
   energyLevel: number;
 } {
-  let stressLevel: number;
-  if (typeof hrvMs === "number" && hrvMs > 0) {
-    // Typical resting RMSSD-style HRV for adults spans roughly 20-100ms;
-    // lower HRV -> higher stress. Confirm the actual units/scale Presage
-    // returns against a real response and retune this range.
-    stressLevel = clamp01(1 - (hrvMs - 20) / 80);
-  } else {
-    stressLevel = clamp01((heartRateBpm - 65) / 40 + (respirationRateBpm - 14) / 20);
-  }
+  const stressLevel = clamp01((heartRateBpm - 65) / 40 + (respirationRateBpm - 14) / 20);
   const energyLevel = clamp01((heartRateBpm - 55) / 50);
   const focusLevel = clamp01(1 - Math.abs(respirationRateBpm - 14) / 10);
   return { stressLevel, focusLevel, energyLevel };
@@ -109,7 +100,7 @@ async function requestUploadUrl(apiKey: string, fileSize: number): Promise<Uploa
   const res = await fetch(`${BASE_URL()}/v2/upload-url`, {
     method: "POST",
     headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
-    body: JSON.stringify({ file_size: fileSize, metrics: ["hr", "rr", "hrv"] }),
+    body: JSON.stringify({ file_size: fileSize, metrics: ["hr", "rr"] }),
   });
   if (!res.ok) {
     throw new Error(`Presage upload-url request failed: ${res.status} ${await res.text()}`);
@@ -151,18 +142,17 @@ async function completeUpload(
   }
 }
 
-/** Tries a few plausible field-name shapes for the retrieve-data payload — see the module comment. hrv is optional; hr/rr are required. */
-function resultFieldsFromResponse(data: Record<string, unknown>): { hr: number; rr: number; hrv: number | null } | null {
+/** Tries a few plausible field-name shapes for the retrieve-data payload — see the module comment. hr/rr are required. */
+function resultFieldsFromResponse(data: Record<string, unknown>): { hr: number; rr: number } | null {
   const hr = data.hr ?? data.heart_rate ?? data.heartRate ?? data.hr_bpm;
   const rr = data.rr ?? data.respiration_rate ?? data.respirationRate ?? data.rr_bpm ?? data.br;
-  const hrvRaw = data.hrv ?? data.hrv_ms ?? data.hrvMs ?? data.rmssd;
   if (typeof hr === "number" && typeof rr === "number") {
-    return { hr, rr, hrv: typeof hrvRaw === "number" ? hrvRaw : null };
+    return { hr, rr };
   }
   return null;
 }
 
-async function pollForResult(apiKey: string, id: string): Promise<{ hr: number; rr: number; hrv: number | null }> {
+async function pollForResult(apiKey: string, id: string): Promise<{ hr: number; rr: number }> {
   const maxAttempts = 15;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const res = await fetch(`${BASE_URL()}/retrieve-data`, {
@@ -204,13 +194,12 @@ export async function analyzeClip(videoBlob: Blob): Promise<PresageReading> {
   const { id, upload_id, urls } = await requestUploadUrl(apiKey, bytes.byteLength);
   const parts = await uploadParts(urls, bytes);
   await completeUpload(apiKey, id, upload_id, parts);
-  const { hr, rr, hrv } = await pollForResult(apiKey, id);
+  const { hr, rr } = await pollForResult(apiKey, id);
 
   return {
     heartRateBpm: hr,
     respirationRateBpm: rr,
-    hrvMs: hrv,
-    ...deriveScores(hr, rr, hrv),
+    ...deriveScores(hr, rr),
     source: "presage",
   };
 }

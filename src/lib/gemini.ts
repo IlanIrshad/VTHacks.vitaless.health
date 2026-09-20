@@ -26,7 +26,6 @@ function getClient(): GoogleGenAI {
 export interface BiometricSnapshot {
   heartRateBpm?: number;
   respirationRateBpm?: number;
-  hrvMs?: number | null;
   stressLevel?: number; // 0-1, derived
   focusLevel?: number; // 0-1, derived
   energyLevel?: number; // 0-1, derived
@@ -53,7 +52,6 @@ function describeBiometrics(b?: BiometricSnapshot): string {
   const parts: string[] = [];
   if (b.heartRateBpm) parts.push(`heart rate ${Math.round(b.heartRateBpm)} bpm`);
   if (b.respirationRateBpm) parts.push(`respiration ${Math.round(b.respirationRateBpm)} breaths/min`);
-  if (typeof b.hrvMs === "number") parts.push(`HRV ${Math.round(b.hrvMs)}ms`);
   if (b.stressLevel !== undefined) parts.push(`stress ${Math.round(b.stressLevel * 100)}%`);
   if (b.focusLevel !== undefined) parts.push(`focus ${Math.round(b.focusLevel * 100)}%`);
   if (b.energyLevel !== undefined) parts.push(`energy ${Math.round(b.energyLevel * 100)}%`);

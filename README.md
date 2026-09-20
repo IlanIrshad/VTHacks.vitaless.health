@@ -8,7 +8,7 @@ mindfulness, focus, energy).
 
 | Tool | Role in this app |
 |---|---|
-| **Presage** (Human Sensing Layer) | The *only* biometric source — estimates heart rate, respiration rate, and heart-rate variability from short webcam clips, which we turn into stress/focus/energy scores that drive the whole experience. There is deliberately no simulated fallback: without a working camera and a configured Presage key, the app shows no reading rather than inventing one. See the note in `src/lib/presage.ts` — Presage's public SDKs are iOS/Android/C++ only, so the browser records a clip and our server forwards it to Presage's Physiology API. |
+| **Presage** (Human Sensing Layer) | The *only* biometric source — estimates heart rate and respiration rate from short webcam clips, which we turn into stress/focus/energy scores that drive the whole experience. There is deliberately no simulated fallback: without a working camera and a configured Presage key, the app shows no reading rather than inventing one. See the note in `src/lib/presage.ts` — Presage's public SDKs are iOS/Android/C++ only, so the browser records a clip and our server forwards it to Presage's Physiology API. |
 | **Google Gemini API** | Powers Sage's conversational replies and per-routine spoken intros, using live biometrics as context (`src/lib/gemini.ts`). |
 | **ElevenLabs** | Turns Sage's replies and routine narration into spoken audio (`src/lib/elevenlabs.ts`). |
 | **Tiger Data (TimescaleDB)** | Stores every biometric sample as a hypertable (`db/schema.sql`) with a continuous aggregate for fast "stress over time" queries. |
@@ -59,10 +59,10 @@ app shows no biometric reading at all — it will never substitute a fake one.
 
 1. `WebcamCapture` records a ~4s clip every 12s and posts it to `POST /api/biometrics`.
 2. The API route forwards the clip to Presage and derives `stressLevel` /
-   `focusLevel` / `energyLevel` (0–1) from the real returned heart rate,
-   respiration rate, and (when present) heart-rate variability. If
-   `PRESAGE_API_KEY` isn't set, or Presage can't process the clip, the route
-   returns an error instead of a reading — never a fabricated one.
+   `focusLevel` / `energyLevel` (0–1) from the real returned heart rate and
+   respiration rate. If `PRESAGE_API_KEY` isn't set, or Presage can't
+   process the clip, the route returns an error instead of a reading —
+   never a fabricated one.
 3. `pickRoutineForState()` (`src/lib/routines.ts`) recommends a routine —
    e.g. box breathing when stress is high, a focus reset when focus is low.
 4. `adaptRoutine()` stretches or compresses each step's duration based on
@@ -86,9 +86,9 @@ BodyFat% = 1.2 * BMI + 0.23 * Age - 10.8 * sex - 5.4   (sex: 1 = male, 0 = femal
 (e.g. "Average", "Fitness") entirely in code. Gemini (`getBodyCompositionInsight`
 in `src/lib/gemini.ts`) only writes a short plain-language explanation of the
 already-computed result — it's explicitly instructed never to invent or
-recalculate the percentage. If live Presage vitals (heart rate, respiration,
-HRV) are available they're shown alongside and passed to Gemini as context,
-but they never factor into the formula itself — body fat % is derived only
+recalculate the percentage. If live Presage vitals (heart rate, respiration)
+are available they're shown alongside and passed to Gemini as context, but
+they never factor into the formula itself — body fat % is derived only
 from height/weight/age/gender, since that's what the formula is actually
 validated on.
 

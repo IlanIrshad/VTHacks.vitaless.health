@@ -47,7 +47,6 @@ export default function BodyScanView({ active, reading, sensingStatus }: BodySca
             ? {
                 heartRateBpm: reading.heartRateBpm,
                 respirationRateBpm: reading.respirationRateBpm,
-                hrvMs: reading.hrvMs,
               }
             : undefined,
         }),
@@ -143,7 +142,7 @@ export default function BodyScanView({ active, reading, sensingStatus }: BodySca
         </div>
 
         <div>
-          <div className="live-metrics" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+          <div className="live-metrics" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
             <div className="live-metric">
               <div className="metric-label" style={{ justifyContent: "center" }}>
                 Heart rate
@@ -157,13 +156,6 @@ export default function BodyScanView({ active, reading, sensingStatus }: BodySca
               </div>
               <div className="val">{reading ? `${Math.round(reading.respirationRateBpm)}/min` : "—"}</div>
               <div className="tag">{reading ? "live" : "no signal"}</div>
-            </div>
-            <div className="live-metric">
-              <div className="metric-label" style={{ justifyContent: "center" }}>
-                HRV
-              </div>
-              <div className="val">{reading && typeof reading.hrvMs === "number" ? `${Math.round(reading.hrvMs)}ms` : "—"}</div>
-              <div className="tag">{reading && typeof reading.hrvMs === "number" ? "live" : "no signal"}</div>
             </div>
           </div>
 
