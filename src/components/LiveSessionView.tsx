@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import WebcamCapture, { sensingStatusLabel, type BiometricReading, type SensingStatus } from "./WebcamCapture";
 import { trendDirection, type HistoryEntry } from "@/lib/trend";
 import type { RoutineId } from "@/lib/routines";
@@ -8,6 +8,8 @@ import type { ChatTurn } from "@/lib/chat";
 
 interface LiveSessionViewProps {
   active: boolean;
+  /** Whether the camera/Presage sensing loop should actually be running right now — see page.tsx for when this is true. */
+  sensing: boolean;
   reading: BiometricReading | null;
   history: HistoryEntry[];
   onReading: (r: BiometricReading) => void;
@@ -21,6 +23,7 @@ interface LiveSessionViewProps {
 
 export default function LiveSessionView({
   active,
+  sensing,
   reading,
   history,
   onReading,
@@ -33,6 +36,14 @@ export default function LiveSessionView({
 }: LiveSessionViewProps) {
   const [status, setStatus] = useState<SensingStatus>("idle");
   const [input, setInput] = useState("");
+
+  // WebcamCapture is only ever mounted while `sensing` is true (see below) —
+  // once it unmounts, nothing updates `status` anymore, so reset it here or
+  // the camera-frame would keep showing whatever it last was (e.g. "live")
+  // even though the stream has actually stopped.
+  useEffect(() => {
+    if (!sensing) setStatus("idle");
+  }, [sensing]);
 
   const hrTrend = trendDirection(history, "heartRateBpm");
   const stressTrend = trendDirection(history, "stressLevel");
@@ -55,23 +66,30 @@ export default function LiveSessionView({
       <div className="session-layout">
         <div>
           <div className="camera-frame">
-            <WebcamCapture
-              onReading={onReading}
-              routineId={routineId}
-              onStatusChange={(s) => {
-                setStatus(s);
-                onSensingStatusChange?.(s);
-              }}
-              visible={status === "live"}
-              className="camera-video"
-            />
-            {status !== "live" && (
+            {sensing && (
+              <WebcamCapture
+                onReading={onReading}
+                routineId={routineId}
+                onStatusChange={(s) => {
+                  setStatus(s);
+                  onSensingStatusChange?.(s);
+                }}
+                visible={status === "live"}
+                className="camera-video"
+              />
+            )}
+            {!sensing && (
+              <div className="camera-overlay">
+                <div style={{ fontSize: 14, fontWeight: 500 }}>Sensing paused — camera is off on this tab</div>
+              </div>
+            )}
+            {sensing && status !== "live" && (
               <div className="camera-overlay">
                 <div className="pulse-dot" />
                 <div style={{ fontSize: 14, fontWeight: 500 }}>{sensingStatusLabel(status)}</div>
               </div>
             )}
-            {status === "live" && !reading && (
+            {sensing && status === "live" && !reading && (
               <div className="camera-overlay" style={{ position: "absolute", bottom: 14 }}>
                 <div style={{ fontSize: 13, fontWeight: 500 }}>Measuring your pulse…</div>
               </div>

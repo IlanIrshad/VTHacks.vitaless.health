@@ -150,6 +150,30 @@ export default function Home() {
 
   const lastCompanionText = [...turns].reverse().find((t) => t.role === "companion")?.text ?? null;
 
+  // The camera/Presage sensing loop only runs when something actually needs
+  // it: the Live session tab itself, or an in-progress routine (adaptive
+  // pacing + the before/after summary both need a live reading regardless of
+  // which tab is currently focused). Everywhere else — Dashboard, Trends, or
+  // browsing the routine list without starting one — it stays off, since a
+  // permanently-running camera stream + capture interval was the actual
+  // cause of the memory/slowness issue.
+  const sensingEnabled = activeView === "session" || activeRoutineId !== null;
+
+  // WebcamCapture only reports status while it's mounted, so once sensing
+  // turns off nothing updates this anymore — reset it explicitly, or the
+  // Dashboard would keep showing whatever status the camera happened to be
+  // in the instant it stopped (e.g. stuck on "live").
+  useEffect(() => {
+    if (!sensingEnabled) setSensingStatus("idle");
+  }, [sensingEnabled]);
+
+  function handleEndSession() {
+    setActiveView("dashboard");
+    // If a routine is also running independently, sensing correctly stays on
+    // for its sake — "End session" ends the Live session tab's own session,
+    // not a routine you'd end separately from the Routines tab.
+  }
+
   return (
     <div>
       <TopNav
@@ -175,6 +199,7 @@ export default function Home() {
         />
         <LiveSessionView
           active={activeView === "session"}
+          sensing={sensingEnabled}
           reading={reading}
           history={history}
           onReading={handleReading}
@@ -183,7 +208,7 @@ export default function Home() {
           turns={turns}
           sending={sending}
           onSend={send}
-          onEndSession={() => setActiveView("dashboard")}
+          onEndSession={handleEndSession}
         />
         <RoutinesView
           active={activeView === "routines"}
