@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { AuthUser, UserPreferences } from "@/lib/useAuth";
 import { VOICE_OPTIONS } from "@/lib/voices";
+import { getBrowserTimezone, getTimezoneOptions } from "@/lib/timezones";
 
 export default function AccountSettingsModal({
   user,
@@ -13,12 +14,24 @@ export default function AccountSettingsModal({
   onClose: () => void;
   onSaved: (preferences: UserPreferences) => void;
 }) {
-  const [timezone, setTimezone] = useState(user.preferences.timezone ?? "");
+  const timezoneOptions = useMemo(() => getTimezoneOptions(), []);
+  const [timezone, setTimezone] = useState(user.preferences.timezone || getBrowserTimezone());
   const [goals, setGoals] = useState(user.preferences.goals ?? "");
   const [preferredVoiceId, setPreferredVoiceId] = useState(user.preferences.preferredVoiceId ?? "");
   const [notifyCheckIns, setNotifyCheckIns] = useState(user.preferences.notifyCheckIns ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [testSendState, setTestSendState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+
+  async function sendTestReminder() {
+    setTestSendState("sending");
+    try {
+      const res = await fetch("/api/reminders/test", { method: "POST" });
+      setTestSendState(res.ok ? "sent" : "error");
+    } catch {
+      setTestSendState("error");
+    }
+  }
 
   async function save() {
     setSaving(true);
@@ -55,7 +68,14 @@ export default function AccountSettingsModal({
 
         <div className="field">
           <label htmlFor="pref-timezone">Timezone</label>
-          <input id="pref-timezone" type="text" placeholder="e.g. America/New_York" value={timezone} onChange={(e) => setTimezone(e.target.value)} />
+          <select id="pref-timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+            {!timezoneOptions.includes(timezone) && <option value={timezone}>{timezone}</option>}
+            {timezoneOptions.map((tz) => (
+              <option key={tz} value={tz}>
+                {tz.replace(/_/g, " ")}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="field">
           <label htmlFor="pref-goals">Wellness goals</label>
@@ -79,8 +99,29 @@ export default function AccountSettingsModal({
         </div>
         <label className="checkbox-row">
           <input type="checkbox" checked={notifyCheckIns} onChange={(e) => setNotifyCheckIns(e.target.checked)} />
-          Remind me to check in
+          Email me a check-in reminder
         </label>
+        <div style={{ marginTop: -8, marginBottom: 14 }}>
+          <button
+            type="button"
+            className="pill-btn"
+            onClick={sendTestReminder}
+            disabled={testSendState === "sending"}
+            style={{ fontSize: 13 }}
+          >
+            {testSendState === "sending" ? "Sending…" : "Send me a test reminder now"}
+          </button>
+          {testSendState === "sent" && (
+            <div className="state-note" style={{ padding: "6px 0 0" }}>
+              Sent — check {user.email}.
+            </div>
+          )}
+          {testSendState === "error" && (
+            <div className="error-text" style={{ padding: "6px 0 0" }}>
+              Couldn't send that email — email sending may not be configured on this server.
+            </div>
+          )}
+        </div>
 
         {error && <div className="error-text">{error}</div>}
 

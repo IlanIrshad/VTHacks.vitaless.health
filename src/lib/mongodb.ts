@@ -41,6 +41,8 @@ export interface UserPreferences {
   preferredVoiceId?: string;
   preferredRoutineId?: string;
   notifyCheckIns?: boolean;
+  /** Set by /api/reminders/send after a real send, so a cron running more than once a day doesn't double-send. Not user-editable. */
+  lastReminderSentAt?: Date;
 }
 
 export interface UserDoc {

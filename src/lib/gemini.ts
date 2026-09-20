@@ -159,3 +159,38 @@ Sage:`;
     `Your estimated body fat is ${bodyFatPercent}% (${category}), based on the Deurenberg formula — a formula-based estimate, not a clinical measurement.`
   );
 }
+
+/**
+ * Writes the body of a check-in reminder email, personalized to the user's
+ * stated wellness goals if they've set any in Account settings. Never
+ * invents a goal the user hasn't actually written down.
+ */
+export async function getCheckInReminderEmail(params: { name: string; goals?: string }): Promise<string> {
+  const ai = getClient();
+  const { name, goals } = params;
+
+  const prompt = `You are Sage, a warm, encouraging AI wellness companion inside the
+Vitaless app. Write a short check-in reminder email body for ${name}.
+
+${goals && goals.trim() ? `Their stated wellness goal: "${goals.trim()}"` : "They haven't written down a specific wellness goal yet."}
+
+Rules:
+- 2-3 short sentences, plain prose, no markdown, no lists, no emoji, no subject line.
+- Gently invite them to open Vitaless for a quick check-in.
+- If a goal is given, reference it naturally and specifically. If not, keep it
+  warm and generic — do not invent a goal they haven't stated.
+- Never make medical claims or diagnoses.
+- Do not sign off with a name — the template already does that.
+
+Sage:`;
+
+  const response = await ai.models.generateContent({
+    model: MODEL,
+    contents: prompt,
+  });
+
+  return (
+    response.text?.trim() ||
+    `Just a friendly nudge to open Vitaless for a quick check-in whenever you have a moment.`
+  );
+}

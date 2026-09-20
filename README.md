@@ -48,11 +48,12 @@ See `.env.example` for the full list and where to get each key:
 - `PRESAGE_API_KEY`, `PRESAGE_API_BASE_URL` — Presage dashboard. Base URL + full request/response contract confirmed live 2026-09-19 (auth is `x-api-key`, not `Authorization: Bearer`; only the `/v2/*` upload endpoints are actually deployed) — see the comment at the top of `src/lib/presage.ts`.
 - `DATABASE_URL` — Tiger Data connection string
 - `MONGODB_URI`, `SESSION_SECRET` — MongoDB Atlas connection string + a random secret for signing session cookies (generate one with the command in `.env.example`)
+- `RESEND_API_KEY`, `EMAIL_FROM`, `REMINDER_CRON_SECRET` — Resend (free tier) for real check-in reminder emails — see "Email check-in reminders" below.
 
-Nothing crashes if a key is missing. For Gemini/ElevenLabs/Mongo, that
-feature just falls back to a text-only/unavailable mode so the rest of the
-demo keeps working. `PRESAGE_API_KEY` is the exception: without it, the app
-shows no biometric reading at all — it will never substitute a fake one.
+Nothing crashes if a key is missing. For Gemini/ElevenLabs/Mongo/Resend,
+that feature just falls back to a text-only/unavailable mode so the rest of
+the demo keeps working. `PRESAGE_API_KEY` is the exception: without it, the
+app shows no biometric reading at all — it will never substitute a fake one.
 
 ## How the biometric-reactive routines work
 
@@ -91,6 +92,35 @@ but they never factor into the formula itself — body fat % is derived only
 from height/weight/age/gender, since that's what the formula is actually
 validated on.
 
+## Email check-in reminders
+
+Signed-in users can turn on "Email me a check-in reminder" in Account
+settings. The email is real, sent via [Resend](https://resend.com/) (free
+tier, no domain verification needed for their shared `onboarding@resend.dev`
+sender), and personalized: `getCheckInReminderEmail` in `src/lib/gemini.ts`
+writes the body from the user's actual saved wellness goal, or a generic
+but still warm message if they haven't set one — it never invents a goal.
+
+- **`POST /api/reminders/test`** — signed-in only, sends one reminder to the
+  caller's own address immediately. This is what the "Send me a test
+  reminder now" button in Account settings hits, so the feature is fully
+  demoable without any cron infrastructure set up.
+- **`POST /api/reminders/send`** — the real batch job for production: emails
+  everyone with reminders on, skipping anyone emailed in the last 20 hours
+  (`preferences.lastReminderSentAt`). Protected by a shared secret header
+  (`x-cron-secret`, matched against `REMINDER_CRON_SECRET`) since it's meant
+  to be triggered by a system cron job, not the browser, e.g.:
+  ```
+  0 14 * * * curl -s -X POST https://your-domain/api/reminders/send \
+    -H "x-cron-secret: $REMINDER_CRON_SECRET"
+  ```
+
+Timezone in Account settings is a dropdown of real IANA zones (via the
+browser's own `Intl.supportedValuesOf("timeZone")`, defaulting to the
+visitor's detected zone) rather than a free-text field — it's not yet used
+to *schedule* reminders at a particular local hour (the cron above sends to
+everyone at once), but it's captured cleanly for whenever that's added.
+
 ## User accounts (optional)
 
 Sign-in is entirely opt-in — every screen works fully anonymously first.
@@ -121,6 +151,9 @@ src/
       sessions/route.ts      GET  -> recent biometric history (Trends tab)
       conversation/route.ts  GET  -> signed-in user's persisted chat history
       profile/route.ts       GET/PUT -> signed-in user's preferences
+      reminders/
+        test/route.ts         POST -> email the signed-in user one reminder now
+        send/route.ts          POST -> cron-secret-protected batch send to all opted-in users
       auth/
         signup, login, logout, me   Account + session endpoints
   components/
@@ -134,6 +167,8 @@ src/
   lib/
     presage.ts, gemini.ts, elevenlabs.ts, routines.ts, trend.ts, chat.ts
     bodyComposition.ts       Deurenberg formula + ACE category bands (body fat %)
+    email.ts                 Resend client, sends the check-in reminder email
+    timezones.ts             Real IANA timezone list for the settings dropdown
     db.ts                    Tiger Data (Postgres) client
     mongodb.ts, auth.ts      MongoDB client + password/session helpers
 db/
