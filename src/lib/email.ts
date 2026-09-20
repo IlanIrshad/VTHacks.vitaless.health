@@ -62,7 +62,21 @@ export async function sendCheckInReminder(params: { to: string; name: string; go
   const { to, name, goals } = params;
   const resend = getClient();
 
-  const body = await getCheckInReminderEmail({ name, goals });
+  let body: string;
+  try {
+    body = await getCheckInReminderEmail({ name, goals });
+  } catch (err) {
+    // Gemini being unavailable (rate-limited, no key, etc.) shouldn't block
+    // the reminder itself — same "don't let the AI touch be a single point
+    // of failure" fallback used in /api/body-composition. Deliberately
+    // always generic here, never echoing the user's raw goals text: Gemini
+    // is given explicit tone/safety instructions for how to reference a
+    // goal (see getCheckInReminderEmail in lib/gemini.ts); a plain string
+    // template has none of that judgment, so it must not repeat
+    // free-text user input back verbatim.
+    console.warn("[email] Gemini reminder body unavailable, using generic fallback:", (err as Error).message);
+    body = "Just a friendly nudge to open Vitaless for a quick check-in whenever you have a moment.";
+  }
   const subject = "A quick check-in from Vitaless";
 
   const { error } = await resend.emails.send({
