@@ -11,6 +11,7 @@ interface LiveSessionViewProps {
   reading: BiometricReading | null;
   history: HistoryEntry[];
   onReading: (r: BiometricReading) => void;
+  onSensingStatusChange?: (status: SensingStatus) => void;
   routineId: RoutineId | null;
   turns: ChatTurn[];
   sending: boolean;
@@ -23,6 +24,7 @@ export default function LiveSessionView({
   reading,
   history,
   onReading,
+  onSensingStatusChange,
   routineId,
   turns,
   sending,
@@ -56,7 +58,10 @@ export default function LiveSessionView({
             <WebcamCapture
               onReading={onReading}
               routineId={routineId}
-              onStatusChange={setStatus}
+              onStatusChange={(s) => {
+                setStatus(s);
+                onSensingStatusChange?.(s);
+              }}
               visible={status === "live"}
               className="camera-video"
             />
@@ -105,7 +110,12 @@ export default function LiveSessionView({
 
           {reading && (
             <div className="source-tag" style={{ marginTop: 10 }}>
-              Source: {reading.source === "presage" ? "Presage Human Sensing Layer" : "estimated (no PRESAGE_API_KEY set)"}
+              Source: Presage Human Sensing Layer{typeof reading.hrvMs === "number" ? ` · HRV ${Math.round(reading.hrvMs)}ms` : ""}
+            </div>
+          )}
+          {!reading && (status === "denied" || status === "unsupported") && (
+            <div className="state-note error" style={{ marginTop: 10 }}>
+              No live vitals — Vitaless only shows real Presage readings, and needs camera access to sense your pulse.
             </div>
           )}
         </div>

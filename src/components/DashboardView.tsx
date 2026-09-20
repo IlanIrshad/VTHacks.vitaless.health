@@ -1,11 +1,12 @@
 "use client";
 
-import type { BiometricReading } from "./WebcamCapture";
+import type { BiometricReading, SensingStatus } from "./WebcamCapture";
 import { minutesAtLevel, trendDirection, type HistoryEntry } from "@/lib/trend";
 
 interface DashboardViewProps {
   active: boolean;
   reading: BiometricReading | null;
+  sensingStatus: SensingStatus;
   history: HistoryEntry[];
   insight: string | null;
   onStartCheckIn: () => void;
@@ -18,8 +19,18 @@ function stressLabel(level: number): string {
   return "Low";
 }
 
-function overallState(reading: BiometricReading | null, history: HistoryEntry[]): { label: string; desc: string } {
+function overallState(
+  reading: BiometricReading | null,
+  sensingStatus: SensingStatus,
+  history: HistoryEntry[]
+): { label: string; desc: string } {
   if (!reading) {
+    if (sensingStatus === "denied" || sensingStatus === "unsupported") {
+      return {
+        label: "No live vitals",
+        desc: "Vitaless only shows real readings from Presage's Human Sensing Layer — grant camera access on the Live session tab to start sensing.",
+      };
+    }
     return { label: "Sensing…", desc: "Measuring your pulse now from your camera — your first reading lands in about 15 seconds." };
   }
   if (reading.stressLevel >= 0.6) {
@@ -44,8 +55,8 @@ function overallState(reading: BiometricReading | null, history: HistoryEntry[])
   };
 }
 
-export default function DashboardView({ active, reading, history, insight, onStartCheckIn, onPlayInsight }: DashboardViewProps) {
-  const state = overallState(reading, history);
+export default function DashboardView({ active, reading, sensingStatus, history, insight, onStartCheckIn, onPlayInsight }: DashboardViewProps) {
+  const state = overallState(reading, sensingStatus, history);
   const hrTrend = trendDirection(history, "heartRateBpm");
   const stressTrend = trendDirection(history, "stressLevel");
 
@@ -122,9 +133,9 @@ export default function DashboardView({ active, reading, history, insight, onSta
       </div>
 
       <div className="footer-note">
-        Vitaless is a wellness tool, not a medical device, and is not for diagnosis. Vitals are camera-based estimates
-        from Presage&apos;s Human Sensing Layer (or simulated when no sponsor key is configured) — not clinical
-        measurements.
+        Vitaless is a wellness tool, not a medical device, and is not for diagnosis. Vitals are real camera-based
+        estimates from Presage&apos;s Human Sensing Layer only — nothing is simulated or invented, so no reading is
+        shown unless Presage actually measured it.
       </div>
     </section>
   );

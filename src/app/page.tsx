@@ -8,7 +8,7 @@ import RoutinesView from "@/components/RoutinesView";
 import TrendsView from "@/components/TrendsView";
 import AuthModal from "@/components/AuthModal";
 import AccountSettingsModal from "@/components/AccountSettingsModal";
-import type { BiometricReading } from "@/components/WebcamCapture";
+import type { BiometricReading, SensingStatus } from "@/components/WebcamCapture";
 import type { RoutineId } from "@/lib/routines";
 import type { ChatTurn } from "@/lib/chat";
 import type { AuthUser } from "@/lib/useAuth";
@@ -22,6 +22,7 @@ const DEFAULT_GREETING: ChatTurn = {
 export default function Home() {
   const [activeView, setActiveView] = useState<ViewId>("dashboard");
   const [reading, setReading] = useState<BiometricReading | null>(null);
+  const [sensingStatus, setSensingStatus] = useState<SensingStatus>("idle");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [activeRoutineId, setActiveRoutineId] = useState<RoutineId | null>(null);
   const [turns, setTurns] = useState<ChatTurn[]>([DEFAULT_GREETING]);
@@ -163,6 +164,7 @@ export default function Home() {
         <DashboardView
           active={activeView === "dashboard"}
           reading={reading}
+          sensingStatus={sensingStatus}
           history={history}
           insight={lastCompanionText}
           onStartCheckIn={handleStartCheckIn}
@@ -176,6 +178,7 @@ export default function Home() {
           reading={reading}
           history={history}
           onReading={handleReading}
+          onSensingStatusChange={setSensingStatus}
           routineId={activeRoutineId}
           turns={turns}
           sending={sending}

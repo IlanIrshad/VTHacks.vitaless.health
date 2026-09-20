@@ -39,6 +39,7 @@ export default function RoutinePlayer({ biometrics, activeRoutineId, onRoutineCh
   const [frozen, setFrozen] = useState<FrozenStep | null>(null);
   const [startReading, setStartReading] = useState<BiometricReading | null>(null);
   const [summary, setSummary] = useState<{ start: BiometricReading; end: BiometricReading; routineTitle: string } | null>(null);
+  const [completedWithoutData, setCompletedWithoutData] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -53,6 +54,7 @@ export default function RoutinePlayer({ biometrics, activeRoutineId, onRoutineCh
     setStepIndex(0);
     setPlaying(false);
     setSummary(null);
+    setCompletedWithoutData(null);
     if (timerRef.current) clearTimeout(timerRef.current);
     if (baseRoutine) {
       setStartReading(biometricsRef.current);
@@ -98,6 +100,11 @@ export default function RoutinePlayer({ biometrics, activeRoutineId, onRoutineCh
         setPlaying(false);
         if (startReading && biometricsRef.current) {
           setSummary({ start: startReading, end: biometricsRef.current, routineTitle: baseRoutine.title });
+        } else {
+          // No real Presage reading was ever received during this routine —
+          // there's nothing honest to show as a before/after, so say so
+          // plainly instead of getting stuck on the last step's Resume button.
+          setCompletedWithoutData(baseRoutine.title);
         }
       }
     }, frozen.durationSec * 1000);
@@ -164,6 +171,23 @@ export default function RoutinePlayer({ biometrics, activeRoutineId, onRoutineCh
           Camera-based estimate over this session — not a clinical measurement.
         </p>
         <div className="routine-actions" style={{ marginTop: 4 }}>
+          <button className="primary-btn" onClick={() => onRoutineChange(null)}>
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (completedWithoutData) {
+    return (
+      <div className="summary-card">
+        <div className="eyebrow">Session complete — {completedWithoutData}</div>
+        <p className="state-note" style={{ marginTop: 8, padding: 0 }}>
+          No real Presage readings came in during this session, so there&apos;s no before/after to show — Vitaless
+          never fills that in with invented numbers. Grant camera access on the Live session tab to see this next time.
+        </p>
+        <div className="routine-actions" style={{ marginTop: 12 }}>
           <button className="primary-btn" onClick={() => onRoutineChange(null)}>
             Done
           </button>

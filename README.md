@@ -8,7 +8,7 @@ mindfulness, focus, energy).
 
 | Tool | Role in this app |
 |---|---|
-| **Presage** (Human Sensing Layer) | Primary, contactless biometric source — estimates heart rate & respiration rate from short webcam clips, which we turn into stress/focus/energy scores that drive the whole experience. See the note in `src/lib/presage.ts` — Presage's public SDKs are iOS/Android/C++ only, so the browser records a clip and our server forwards it to Presage's Physiology API. |
+| **Presage** (Human Sensing Layer) | The *only* biometric source — estimates heart rate, respiration rate, and heart-rate variability from short webcam clips, which we turn into stress/focus/energy scores that drive the whole experience. There is deliberately no simulated fallback: without a working camera and a configured Presage key, the app shows no reading rather than inventing one. See the note in `src/lib/presage.ts` — Presage's public SDKs are iOS/Android/C++ only, so the browser records a clip and our server forwards it to Presage's Physiology API. |
 | **Google Gemini API** | Powers Sage's conversational replies and per-routine spoken intros, using live biometrics as context (`src/lib/gemini.ts`). |
 | **ElevenLabs** | Turns Sage's replies and routine narration into spoken audio (`src/lib/elevenlabs.ts`). |
 | **Tiger Data (TimescaleDB)** | Stores every biometric sample as a hypertable (`db/schema.sql`) with a continuous aggregate for fast "stress over time" queries. |
@@ -16,10 +16,12 @@ mindfulness, focus, energy).
 | **Vultr** *(not yet wired up)* | Intended deployment target — see "Deploying" below. |
 | **GoDaddy** *(not yet wired up)* | Register a project domain and point it at the Vultr deployment for the "Best Domain Name" award. |
 
-The app is fully demoable **without any API keys**: every integration has a
-graceful fallback (simulated biometrics, and text-only companion replies if
-voice/Gemini keys are missing), so you can develop the UI before sponsor
-credentials are issued at check-in.
+Most of the app is demoable without every key: Gemini/ElevenLabs/Tiger
+Data/MongoDB all degrade gracefully (text-only companion replies, no voice,
+no persistence) if their key is missing. **Biometrics are the one deliberate
+exception** — there is no simulated fallback. Without a working camera and a
+configured `PRESAGE_API_KEY`, the app shows no reading at all rather than
+inventing one; every number on screen came from a real Presage measurement.
 
 ## Getting started
 
@@ -33,8 +35,9 @@ npm run dev
 MongoDB needs no init script — collections and the unique index on
 `users.email` are created automatically on first signup.
 
-Open http://localhost:3000. Grant camera access when prompted (or skip it —
-the app falls back to simulated biometrics automatically).
+Open http://localhost:3000. Grant camera access when prompted — without it
+(and without `PRESAGE_API_KEY` set), the app has no biometric data to show
+and says so honestly rather than making numbers up.
 
 ## Environment variables
 
@@ -46,16 +49,19 @@ See `.env.example` for the full list and where to get each key:
 - `DATABASE_URL` — Tiger Data connection string
 - `MONGODB_URI`, `SESSION_SECRET` — MongoDB Atlas connection string + a random secret for signing session cookies (generate one with the command in `.env.example`)
 
-Nothing crashes if a key is missing — that feature just falls back to a
-simulated/text-only mode (or, for Mongo, sign-in simply stays unavailable)
-so the rest of the demo keeps working.
+Nothing crashes if a key is missing. For Gemini/ElevenLabs/Mongo, that
+feature just falls back to a text-only/unavailable mode so the rest of the
+demo keeps working. `PRESAGE_API_KEY` is the exception: without it, the app
+shows no biometric reading at all — it will never substitute a fake one.
 
 ## How the biometric-reactive routines work
 
 1. `WebcamCapture` records a ~4s clip every 12s and posts it to `POST /api/biometrics`.
-2. The API route forwards the clip to Presage (or, with no key, returns a
-   simulated-but-plausible reading) and derives `stressLevel` / `focusLevel`
-   / `energyLevel` (0–1) from heart rate & respiration rate.
+2. The API route forwards the clip to Presage and derives `stressLevel` /
+   `focusLevel` / `energyLevel` (0–1) from the real returned heart rate,
+   respiration rate, and (when present) heart-rate variability. If
+   `PRESAGE_API_KEY` isn't set, or Presage can't process the clip, the route
+   returns an error instead of a reading — never a fabricated one.
 3. `pickRoutineForState()` (`src/lib/routines.ts`) recommends a routine —
    e.g. box breathing when stress is high, a focus reset when focus is low.
 4. `adaptRoutine()` stretches or compresses each step's duration based on
@@ -125,5 +131,8 @@ scripts/
 
 This README doubles as the write-up for "meaningful, demoable" sponsor tool
 integration — each tool above is called in a real code path, not just
-mentioned. If a key isn't available for a given sponsor at demo time, say so
-and show the graceful fallback instead of claiming the integration works.
+mentioned. If a key isn't available for Gemini/ElevenLabs/Mongo at demo
+time, say so and show the graceful fallback instead of claiming the
+integration works. Presage has no fallback to fall back to — if its key
+isn't working, the honest thing to show is no biometric reading, not a
+fake one.

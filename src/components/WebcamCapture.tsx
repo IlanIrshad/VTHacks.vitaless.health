@@ -5,10 +5,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export interface BiometricReading {
   heartRateBpm: number;
   respirationRateBpm: number;
+  hrvMs: number | null;
   stressLevel: number;
   focusLevel: number;
   energyLevel: number;
-  source: "presage" | "simulated";
+  source: "presage";
 }
 
 export type SensingStatus = "idle" | "starting" | "live" | "denied" | "unsupported";
@@ -27,15 +28,15 @@ interface WebcamCaptureProps {
 
 /**
  * Captures short webcam clips at a fixed interval and sends them to
- * /api/biometrics, which forwards them to Presage for vitals/emotion/focus
- * analysis (see src/lib/presage.ts for why this two-hop approach is needed —
- * Presage has no browser SDK).
+ * /api/biometrics, which forwards them to Presage for vitals analysis (see
+ * src/lib/presage.ts for why this two-hop approach is needed — Presage has
+ * no browser SDK).
  *
- * Falls back to simulated readings automatically if camera access is denied
- * or unavailable, so the rest of the app stays demoable. Mount this once near
- * the app root (not per-tab) so sensing starts the instant the page loads,
- * per the "reading appears within 15 seconds" demo requirement — pass
- * `visible` to control whether the feed is actually shown.
+ * There is no simulated/fabricated fallback: without camera access, or
+ * without a configured Presage key, this component simply reports no
+ * reading rather than inventing one. Mount this once near the app root (not
+ * per-tab) so sensing starts the instant the page loads — pass `visible` to
+ * control whether the feed is actually shown.
  */
 export default function WebcamCapture({
   onReading,
@@ -69,21 +70,18 @@ export default function WebcamCapture({
     [onStatusChange]
   );
 
-  const sendClip = useCallback(async (blob: Blob | null) => {
+  const sendClip = useCallback(async (blob: Blob) => {
     try {
       const params = new URLSearchParams({ userId: "demo-user" });
       const currentRoutineId = routineIdRef.current;
       if (currentRoutineId) params.set("routineId", currentRoutineId);
 
-      let res: Response;
-      if (blob) {
-        const form = new FormData();
-        form.append("video", blob, "clip.webm");
-        res = await fetch(`/api/biometrics?${params.toString()}`, { method: "POST", body: form });
-      } else {
-        // No camera available — server returns a simulated reading.
-        res = await fetch(`/api/biometrics?${params.toString()}`, { method: "POST" });
-      }
+      const form = new FormData();
+      form.append("video", blob, "clip.webm");
+      const res = await fetch(`/api/biometrics?${params.toString()}`, { method: "POST", body: form });
+      // A non-2xx response means Presage couldn't produce a real reading for
+      // this clip (missing key, processing failure, timeout, etc). We skip
+      // this sample rather than showing anything — the next interval retries.
       if (!res.ok) return;
       const reading = (await res.json()) as BiometricReading;
       onReadingRef.current(reading);
@@ -94,10 +92,7 @@ export default function WebcamCapture({
 
   const recordOneClip = useCallback(() => {
     const stream = streamRef.current;
-    if (!stream || typeof MediaRecorder === "undefined") {
-      sendClip(null);
-      return;
-    }
+    if (!stream || typeof MediaRecorder === "undefined") return;
     const chunks: BlobPart[] = [];
     const recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
     recorderRef.current = recorder;
@@ -114,8 +109,6 @@ export default function WebcamCapture({
     async function start() {
       if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
         setStatus("unsupported");
-        intervalId = setInterval(() => sendClip(null), intervalSec * 1000);
-        sendClip(null);
         return;
       }
       setStatus("starting");
@@ -132,8 +125,6 @@ export default function WebcamCapture({
         intervalId = setInterval(recordOneClip, intervalSec * 1000);
       } catch {
         setStatus("denied");
-        intervalId = setInterval(() => sendClip(null), intervalSec * 1000);
-        sendClip(null);
       }
     }
 
@@ -168,9 +159,9 @@ export function sensingStatusLabel(status: SensingStatus, intervalSec = 12): str
     case "starting":
       return "Requesting camera access…";
     case "denied":
-      return "Camera unavailable — using estimated data";
+      return "Camera unavailable — no live vitals";
     case "unsupported":
-      return "Camera not supported in this browser — using estimated data";
+      return "Camera not supported in this browser — no live vitals";
     default:
       return "Starting…";
   }
