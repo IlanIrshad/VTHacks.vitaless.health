@@ -25,7 +25,7 @@ const ALLOWED_KEYS: (keyof UserPreferences)[] = [
   "goals",
   "preferredVoiceId",
   "preferredRoutineId",
-  "notifyCheckIns",
+  "reminderScheduledAt",
 ];
 
 export async function PUT(req: NextRequest) {
@@ -34,9 +34,22 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
+
+    if ("reminderScheduledAt" in body && body.reminderScheduledAt) {
+      const when = new Date(body.reminderScheduledAt);
+      if (Number.isNaN(when.getTime())) {
+        return NextResponse.json({ error: "That reminder date/time isn't valid." }, { status: 400 });
+      }
+      if (when.getTime() <= Date.now()) {
+        return NextResponse.json({ error: "Pick a reminder time in the future." }, { status: 400 });
+      }
+    }
+
     const updates: Partial<UserPreferences> = {};
     for (const key of ALLOWED_KEYS) {
-      if (key in body) updates[key] = body[key];
+      if (key in body) {
+        updates[key] = key === "reminderScheduledAt" ? (body[key] ? new Date(body[key]) : null) : body[key];
+      }
     }
 
     const db = await getDb();

@@ -1,19 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, type UserDoc } from "@/lib/mongodb";
-import { sendCheckInReminder } from "@/lib/email";
+import { processDueReminders } from "@/lib/reminders";
 
 export const runtime = "nodejs";
 
-const MIN_HOURS_BETWEEN_SENDS = 20;
-
 /**
- * Batch-sends real check-in reminder emails to every opted-in user. Not
- * meant to be hit from the browser — protected by a shared secret and meant
- * to be triggered by a system cron job (see README "Email reminders").
- *
- * Example crontab entry (once a day):
- *   0 14 * * * curl -s -X POST https://your-domain/api/reminders/send \
- *     -H "x-cron-secret: $REMINDER_CRON_SECRET"
+ * Manually runs the same due-reminder check the background scheduler
+ * (src/lib/reminderScheduler.ts) already runs every 60s on its own — this
+ * route exists for ops visibility and for hosts that don't run this app as
+ * a persistent process. Not meant to be hit from the browser — protected by
+ * a shared secret (see README "Email check-in reminders").
  */
 export async function POST(req: NextRequest) {
   const configuredSecret = process.env.REMINDER_CRON_SECRET;
@@ -25,30 +20,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const db = await getDb();
-    const cutoff = new Date(Date.now() - MIN_HOURS_BETWEEN_SENDS * 60 * 60 * 1000);
-    const users = await db
-      .collection<UserDoc>("users")
-      .find({
-        "preferences.notifyCheckIns": true,
-        $or: [{ "preferences.lastReminderSentAt": { $exists: false } }, { "preferences.lastReminderSentAt": { $lt: cutoff } }],
-      })
-      .toArray();
-
-    let sent = 0;
-    let failed = 0;
-    for (const user of users) {
-      try {
-        await sendCheckInReminder({ to: user.email, name: user.name, goals: user.preferences?.goals });
-        await db.collection<UserDoc>("users").updateOne({ _id: user._id }, { $set: { "preferences.lastReminderSentAt": new Date() } });
-        sent += 1;
-      } catch (err) {
-        failed += 1;
-        console.error("[/api/reminders/send]", user.email, (err as Error).message);
-      }
-    }
-
-    return NextResponse.json({ sent, failed, eligible: users.length });
+    const result = await processDueReminders();
+    return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[/api/reminders/send]", message);

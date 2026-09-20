@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { AuthUser, UserPreferences } from "@/lib/useAuth";
 import { VOICE_OPTIONS } from "@/lib/voices";
 import { getBrowserTimezone, getTimezoneOptions } from "@/lib/timezones";
+import { fromDatetimeLocalValue, toDatetimeLocalValue } from "@/lib/datetime";
 
 export default function AccountSettingsModal({
   user,
@@ -18,10 +19,15 @@ export default function AccountSettingsModal({
   const [timezone, setTimezone] = useState(user.preferences.timezone || getBrowserTimezone());
   const [goals, setGoals] = useState(user.preferences.goals ?? "");
   const [preferredVoiceId, setPreferredVoiceId] = useState(user.preferences.preferredVoiceId ?? "");
-  const [notifyCheckIns, setNotifyCheckIns] = useState(user.preferences.notifyCheckIns ?? false);
+  const [reminderAt, setReminderAt] = useState(toDatetimeLocalValue(user.preferences.reminderScheduledAt));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [testSendState, setTestSendState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+
+  const minReminderAt = useMemo(() => toDatetimeLocalValue(new Date().toISOString()), []);
+  const reminderFriendly = reminderAt
+    ? new Date(reminderAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+    : null;
 
   async function sendTestReminder() {
     setTestSendState("sending");
@@ -40,7 +46,7 @@ export default function AccountSettingsModal({
       const res = await fetch("/api/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ timezone, goals, preferredVoiceId, notifyCheckIns }),
+        body: JSON.stringify({ timezone, goals, preferredVoiceId, reminderScheduledAt: fromDatetimeLocalValue(reminderAt) }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -97,10 +103,21 @@ export default function AccountSettingsModal({
             )}
           </select>
         </div>
-        <label className="checkbox-row">
-          <input type="checkbox" checked={notifyCheckIns} onChange={(e) => setNotifyCheckIns(e.target.checked)} />
-          Email me a check-in reminder
-        </label>
+        <div className="field">
+          <label htmlFor="pref-reminder-at">Email me a check-in reminder at</label>
+          <input
+            id="pref-reminder-at"
+            type="datetime-local"
+            value={reminderAt}
+            min={minReminderAt}
+            onChange={(e) => setReminderAt(e.target.value)}
+          />
+          <div className="state-note" style={{ padding: 0 }}>
+            {reminderFriendly
+              ? `One email, scheduled for ${reminderFriendly} (your local time). Clear the field and save to cancel it.`
+              : "Pick a date and time — you'll get exactly one reminder email then. Leave blank for none."}
+          </div>
+        </div>
         <div style={{ marginTop: -8, marginBottom: 14 }}>
           <button
             type="button"

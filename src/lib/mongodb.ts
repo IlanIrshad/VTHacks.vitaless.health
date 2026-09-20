@@ -40,8 +40,9 @@ export interface UserPreferences {
   goals?: string;
   preferredVoiceId?: string;
   preferredRoutineId?: string;
-  notifyCheckIns?: boolean;
-  /** Set by /api/reminders/send after a real send, so a cron running more than once a day doesn't double-send. Not user-editable. */
+  /** One-time check-in reminder date+time the user picked in Account settings. Cleared automatically once it sends. */
+  reminderScheduledAt?: Date | null;
+  /** Set after a reminder actually sends (scheduled or test), for display only. Not user-editable. */
   lastReminderSentAt?: Date;
 }
 

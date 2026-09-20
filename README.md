@@ -94,32 +94,49 @@ validated on.
 
 ## Email check-in reminders
 
-Signed-in users can turn on "Email me a check-in reminder" in Account
-settings. The email is real, sent via [Resend](https://resend.com/) (free
-tier, no domain verification needed for their shared `onboarding@resend.dev`
-sender), and personalized: `getCheckInReminderEmail` in `src/lib/gemini.ts`
+Signed-in users can pick an exact date and time in Account settings
+("Email me a check-in reminder at") and get exactly one real reminder
+email at that moment — via a native `<input type="datetime-local">`
+(`src/components/AccountSettingsModal.tsx`), not a recurring daily send.
+The email itself is sent via [Resend](https://resend.com/) (free tier, no
+domain verification needed for their shared `onboarding@resend.dev`
+sender) and personalized: `getCheckInReminderEmail` in `src/lib/gemini.ts`
 writes the body from the user's actual saved wellness goal, or a generic
 but still warm message if they haven't set one — it never invents a goal.
 
+- The picked date+time is read in the browser's own local clock and sent
+  to the server as an ISO timestamp (`src/lib/datetime.ts`), stored as
+  `preferences.reminderScheduledAt`. Validated server-side
+  (`/api/profile`) to be a real, future date/time. Clearing the field and
+  saving cancels it.
+- **`src/lib/reminderScheduler.ts`** — a background poller, started once
+  per server process from `src/instrumentation.ts` (Next's `register()`
+  hook, which runs when the server starts), checks every 60s for any
+  `reminderScheduledAt` that's arrived and sends it (`src/lib/reminders.ts`
+  → `processDueReminders()`), then clears the schedule so it fires exactly
+  once. Because this app runs as a persistent Node process (`npm start` on
+  the Vultr target below, not a serverless host), this "just works" with
+  no cron setup — the reminder fires on its own while the server is up.
 - **`POST /api/reminders/test`** — signed-in only, sends one reminder to the
-  caller's own address immediately. This is what the "Send me a test
-  reminder now" button in Account settings hits, so the feature is fully
-  demoable without any cron infrastructure set up.
-- **`POST /api/reminders/send`** — the real batch job for production: emails
-  everyone with reminders on, skipping anyone emailed in the last 20 hours
-  (`preferences.lastReminderSentAt`). Protected by a shared secret header
-  (`x-cron-secret`, matched against `REMINDER_CRON_SECRET`) since it's meant
-  to be triggered by a system cron job, not the browser, e.g.:
+  caller's own address immediately, ignoring any schedule. This is what the
+  "Send me a test reminder now" button in Account settings hits, so the
+  feature is demoable without waiting for a scheduled time.
+- **`POST /api/reminders/send`** — manually runs the same due-reminder check
+  the background poller already runs every 60s; exists for ops visibility
+  and for hosts that don't run this app as a persistent process. Protected
+  by a shared secret header (`x-cron-secret`, matched against
+  `REMINDER_CRON_SECRET`), e.g.:
   ```
-  0 14 * * * curl -s -X POST https://your-domain/api/reminders/send \
+  curl -s -X POST https://your-domain/api/reminders/send \
     -H "x-cron-secret: $REMINDER_CRON_SECRET"
   ```
 
-Timezone in Account settings is a dropdown of real IANA zones (via the
-browser's own `Intl.supportedValuesOf("timeZone")`, defaulting to the
-visitor's detected zone) rather than a free-text field — it's not yet used
-to *schedule* reminders at a particular local hour (the cron above sends to
-everyone at once), but it's captured cleanly for whenever that's added.
+Timezone in Account settings is a separate dropdown of real IANA zones (via
+the browser's own `Intl.supportedValuesOf("timeZone")`, defaulting to the
+visitor's detected zone) rather than a free-text field — it's currently
+informational (used as general profile context) rather than feeding the
+reminder scheduler, since the reminder date/time picker already captures
+the user's intended moment directly in their local clock.
 
 ## User accounts (optional)
 
@@ -141,6 +158,7 @@ timeline, same as everywhere else non-essential was cut (see the build plan).
 
 ```
 src/
+  instrumentation.ts          Next's server-start hook — boots the reminder scheduler
   app/
     page.tsx                 Root: shared state (biometrics, chat, auth) + tab views
     api/
@@ -150,10 +168,10 @@ src/
       body-composition/route.ts  POST -> body fat % estimate (formula) + Gemini insight
       sessions/route.ts      GET  -> recent biometric history (Trends tab)
       conversation/route.ts  GET  -> signed-in user's persisted chat history
-      profile/route.ts       GET/PUT -> signed-in user's preferences
+      profile/route.ts       GET/PUT -> signed-in user's preferences (incl. reminderScheduledAt)
       reminders/
         test/route.ts         POST -> email the signed-in user one reminder now
-        send/route.ts          POST -> cron-secret-protected batch send to all opted-in users
+        send/route.ts          POST -> cron-secret-protected manual run of the due-reminder check
       auth/
         signup, login, logout, me   Account + session endpoints
   components/
@@ -168,7 +186,10 @@ src/
     presage.ts, gemini.ts, elevenlabs.ts, routines.ts, trend.ts, chat.ts
     bodyComposition.ts       Deurenberg formula + ACE category bands (body fat %)
     email.ts                 Resend client, sends the check-in reminder email
+    reminders.ts             processDueReminders() — the actual due-reminder send logic
+    reminderScheduler.ts     Starts the 60s background poll (once per server process)
     timezones.ts             Real IANA timezone list for the settings dropdown
+    datetime.ts               <input type="datetime-local"> <-> ISO timestamp conversion
     db.ts                    Tiger Data (Postgres) client
     mongodb.ts, auth.ts      MongoDB client + password/session helpers
 db/

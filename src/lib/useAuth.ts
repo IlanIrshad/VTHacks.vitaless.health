@@ -3,7 +3,9 @@ export interface UserPreferences {
   goals?: string;
   preferredVoiceId?: string;
   preferredRoutineId?: string;
-  notifyCheckIns?: boolean;
+  /** One-time check-in reminder date+time, as an ISO string once it comes back over JSON. Null/absent = no reminder scheduled. */
+  reminderScheduledAt?: string | null;
+  lastReminderSentAt?: string;
 }
 
 export interface AuthUser {
