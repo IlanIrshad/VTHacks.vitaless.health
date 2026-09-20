@@ -26,6 +26,7 @@ function getClient(): GoogleGenAI {
 export interface BiometricSnapshot {
   heartRateBpm?: number;
   respirationRateBpm?: number;
+  hrvMs?: number | null;
   stressLevel?: number; // 0-1, derived
   focusLevel?: number; // 0-1, derived
   energyLevel?: number; // 0-1, derived
@@ -52,6 +53,7 @@ function describeBiometrics(b?: BiometricSnapshot): string {
   const parts: string[] = [];
   if (b.heartRateBpm) parts.push(`heart rate ${Math.round(b.heartRateBpm)} bpm`);
   if (b.respirationRateBpm) parts.push(`respiration ${Math.round(b.respirationRateBpm)} breaths/min`);
+  if (typeof b.hrvMs === "number") parts.push(`HRV ${Math.round(b.hrvMs)}ms`);
   if (b.stressLevel !== undefined) parts.push(`stress ${Math.round(b.stressLevel * 100)}%`);
   if (b.focusLevel !== undefined) parts.push(`focus ${Math.round(b.focusLevel * 100)}%`);
   if (b.energyLevel !== undefined) parts.push(`energy ${Math.round(b.energyLevel * 100)}%`);
@@ -104,4 +106,56 @@ doing right now without sounding clinical.`;
   });
 
   return response.text?.trim() || `Let's begin ${routineTitle}.`;
+}
+
+/**
+ * Writes a short interpretation of an already-computed body-fat estimate.
+ * Gemini never produces the percentage itself (see lib/bodyComposition.ts
+ * for why) — it only explains a real, formula-derived number, using live
+ * Presage vitals as supporting context if available.
+ */
+export async function getBodyCompositionInsight(params: {
+  bodyFatPercent: number;
+  category: string;
+  bmi: number;
+  age: number;
+  gender: string;
+  biometrics?: BiometricSnapshot;
+}): Promise<string> {
+  const ai = getClient();
+  const { bodyFatPercent, category, bmi, age, gender, biometrics } = params;
+
+  const prompt = `You are Sage, a warm, encouraging AI wellness companion. A body
+composition estimate has already been calculated for the user using a
+published formula (Deurenberg 1991, from BMI/age/gender) — you are NOT
+calculating or guessing the number, only explaining one that's already
+computed:
+
+- Estimated body fat: ${bodyFatPercent}%
+- Category: ${category}
+- BMI: ${bmi}
+- Age: ${age}, Gender: ${gender}
+- Live vitals right now: ${describeBiometrics(biometrics)}
+
+Write 2-4 short sentences, in plain prose (no markdown, no lists, no
+emoji — this may be read aloud):
+- State the estimate and category plainly, and mention once that it's a
+  formula-based estimate, not a clinical measurement.
+- If live vitals are available, you may reference them as general context,
+  but never imply they were used to calculate body fat — they weren't.
+- Never use judgmental, shaming, or diagnostic language about body size.
+  Frame everything neutrally and supportively.
+- Do not suggest diets, supplements, or specific numeric goals.
+
+Sage:`;
+
+  const response = await ai.models.generateContent({
+    model: MODEL,
+    contents: prompt,
+  });
+
+  return (
+    response.text?.trim() ||
+    `Your estimated body fat is ${bodyFatPercent}% (${category}), based on the Deurenberg formula — a formula-based estimate, not a clinical measurement.`
+  );
 }

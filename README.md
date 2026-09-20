@@ -71,6 +71,26 @@ shows no biometric reading at all — it will never substitute a fake one.
 6. Every sample is logged to the Tiger Data hypertable via `/api/biometrics`,
    and `GET /api/sessions` returns recent history for the Trends tab.
 
+## Body composition scan
+
+The "Body scan" tab estimates body fat % from height, weight, age, and
+gender using the Deurenberg (1991) formula — a real published equation, not
+a Gemini guess:
+
+```
+BodyFat% = 1.2 * BMI + 0.23 * Age - 10.8 * sex - 5.4   (sex: 1 = male, 0 = female)
+```
+
+`src/lib/bodyComposition.ts` computes the number and its ACE category band
+(e.g. "Average", "Fitness") entirely in code. Gemini (`getBodyCompositionInsight`
+in `src/lib/gemini.ts`) only writes a short plain-language explanation of the
+already-computed result — it's explicitly instructed never to invent or
+recalculate the percentage. If live Presage vitals (heart rate, respiration,
+HRV) are available they're shown alongside and passed to Gemini as context,
+but they never factor into the formula itself — body fat % is derived only
+from height/weight/age/gender, since that's what the formula is actually
+validated on.
+
 ## User accounts (optional)
 
 Sign-in is entirely opt-in — every screen works fully anonymously first.
@@ -97,20 +117,23 @@ src/
       companion/route.ts     POST -> Gemini reply (+ persists chat turn if signed in)
       voice/route.ts         POST -> ElevenLabs audio (mp3)
       biometrics/route.ts    POST -> Presage reading + Tiger Data log
+      body-composition/route.ts  POST -> body fat % estimate (formula) + Gemini insight
       sessions/route.ts      GET  -> recent biometric history (Trends tab)
       conversation/route.ts  GET  -> signed-in user's persisted chat history
       profile/route.ts       GET/PUT -> signed-in user's preferences
       auth/
         signup, login, logout, me   Account + session endpoints
   components/
-    WebcamCapture.tsx        Always-mounted sensing loop, posts to /api/biometrics
-    DashboardView, LiveSessionView, RoutinesView, TrendsView   The 4 tabs
+    WebcamCapture.tsx        Sensing loop (camera + Presage), posts to /api/biometrics —
+                              only mounted while a tab that needs it is active
+    DashboardView, LiveSessionView, RoutinesView, TrendsView, BodyScanView   The 5 tabs
     RoutinePlayer.tsx        Step-by-step narrated routine player + session summary
     BreathingCircle.tsx      Pacing-synced breathing visual
     TopNav.tsx                Tab nav + account menu
     AuthModal.tsx, AccountSettingsModal.tsx   Sign-in/up and preferences UI
   lib/
     presage.ts, gemini.ts, elevenlabs.ts, routines.ts, trend.ts, chat.ts
+    bodyComposition.ts       Deurenberg formula + ACE category bands (body fat %)
     db.ts                    Tiger Data (Postgres) client
     mongodb.ts, auth.ts      MongoDB client + password/session helpers
 db/

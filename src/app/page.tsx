@@ -6,6 +6,7 @@ import DashboardView from "@/components/DashboardView";
 import LiveSessionView from "@/components/LiveSessionView";
 import RoutinesView from "@/components/RoutinesView";
 import TrendsView from "@/components/TrendsView";
+import BodyScanView from "@/components/BodyScanView";
 import AuthModal from "@/components/AuthModal";
 import AccountSettingsModal from "@/components/AccountSettingsModal";
 import type { BiometricReading, SensingStatus } from "@/components/WebcamCapture";
@@ -151,13 +152,14 @@ export default function Home() {
   const lastCompanionText = [...turns].reverse().find((t) => t.role === "companion")?.text ?? null;
 
   // The camera/Presage sensing loop only runs when something actually needs
-  // it: the Live session tab itself, or an in-progress routine (adaptive
-  // pacing + the before/after summary both need a live reading regardless of
-  // which tab is currently focused). Everywhere else — Dashboard, Trends, or
-  // browsing the routine list without starting one — it stays off, since a
+  // it: the Live session tab, the Body scan tab (live vitals shown as
+  // context there), or an in-progress routine (adaptive pacing + the
+  // before/after summary both need a live reading regardless of which tab
+  // is currently focused). Everywhere else — Dashboard, Trends, or browsing
+  // the routine list without starting one — it stays off, since a
   // permanently-running camera stream + capture interval was the actual
   // cause of the memory/slowness issue.
-  const sensingEnabled = activeView === "session" || activeRoutineId !== null;
+  const sensingEnabled = activeView === "session" || activeView === "scan" || activeRoutineId !== null;
 
   // WebcamCapture only reports status while it's mounted, so once sensing
   // turns off nothing updates this anymore — reset it explicitly, or the
@@ -217,6 +219,7 @@ export default function Home() {
           onRoutineChange={setActiveRoutineId}
         />
         <TrendsView active={activeView === "trends"} />
+        <BodyScanView active={activeView === "scan"} reading={reading} sensingStatus={sensingStatus} />
       </main>
 
       {authModalOpen && (

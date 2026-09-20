@@ -3,13 +3,14 @@
 import { useState } from "react";
 import type { AuthUser } from "@/lib/useAuth";
 
-export type ViewId = "dashboard" | "session" | "routines" | "trends";
+export type ViewId = "dashboard" | "session" | "routines" | "trends" | "scan";
 
 const TABS: { id: ViewId; label: string }[] = [
   { id: "dashboard", label: "Dashboard" },
   { id: "session", label: "Live session" },
   { id: "routines", label: "Routines" },
   { id: "trends", label: "Trends" },
+  { id: "scan", label: "Body scan" },
 ];
 
 interface TopNavProps {
